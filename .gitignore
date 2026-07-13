@@ -20,9 +20,15 @@
 # production
 /build
 
+# electron build output (installers + unpacked app)
+/dist-electron/
+
 # misc
 .DS_Store
 *.pem
+
+# local data + on-disk caches (leetcode API + LLM responses)
+/.data/
 
 # debug
 npm-debug.log*

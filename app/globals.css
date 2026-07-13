@@ -1,26 +1,121 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #0b0f17;
+  --foreground: #e7ecf3;
+  --card: #131826;
+  --border: #232a3b;
+  --muted: #8a94a7;
+  --accent: #7c93ff;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --color-card: var(--card);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-accent: var(--accent);
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
+  --font-mono: var(--font-geist-mono), ui-monospace, monospace;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
+html,
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  min-height: 100vh;
+}
+
+* {
+  border-color: var(--border);
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #2a3346;
+  border-radius: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Markdown prose (chat / explanations) */
+.prose-chat {
+  line-height: 1.6;
+}
+.prose-chat p {
+  margin: 0.5rem 0;
+}
+.prose-chat ul {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+  list-style: disc;
+}
+.prose-chat ol {
+  margin: 0.5rem 0;
+  padding-left: 1.25rem;
+  list-style: decimal;
+}
+.prose-chat code {
+  background: #0b0f17;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  padding: 0.05rem 0.3rem;
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+.prose-chat pre {
+  background: #0b0f17;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin: 0.6rem 0;
+}
+.prose-chat pre code {
+  border: none;
+  background: transparent;
+  padding: 0;
+}
+.prose-chat h1,
+.prose-chat h2,
+.prose-chat h3 {
+  font-weight: 600;
+  margin: 0.8rem 0 0.4rem;
+}
+.prose-chat a {
+  color: var(--accent);
+  text-decoration: underline;
+}
+
+/* LeetCode statement HTML */
+.lc-statement {
+  line-height: 1.65;
+  font-size: 0.95rem;
+}
+.lc-statement pre {
+  background: #0b0f17;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 0.75rem;
+  overflow-x: auto;
+  margin: 0.6rem 0;
+  font-family: var(--font-mono);
+  font-size: 0.85rem;
+}
+.lc-statement code {
+  font-family: var(--font-mono);
+  font-size: 0.85em;
+}
+.lc-statement strong {
+  color: #fff;
+}
+.lc-statement ul {
+  list-style: disc;
+  padding-left: 1.25rem;
+  margin: 0.5rem 0;
 }

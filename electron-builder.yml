@@ -1,0 +1,44 @@
+appId: com.dxdbye.app
+productName: dx dbye
+copyright: ParaPsychic
+
+directories:
+  output: dist-electron
+  buildResources: build
+
+# Only the Electron shell goes into the asar. The actual Next app (server +
+# its traced node_modules) ships as extraResources and runs as a child process,
+# so we exclude node_modules from the asar to keep it small.
+files:
+  - electron/**/*
+  - package.json
+  - "!node_modules/**/*"
+
+extraResources:
+  - from: .next/standalone
+    to: app
+  - from: .next/static
+    to: app/.next/static
+  - from: public
+    to: app/public
+
+asar: true
+
+win:
+  target:
+    - nsis
+  artifactName: ${productName}-Setup-${version}.${ext}
+
+nsis:
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+
+mac:
+  target: dmg
+  category: public.app-category.developer-tools
+
+linux:
+  target: AppImage
+  category: Development

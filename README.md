@@ -1,4 +1,4 @@
-# LeetCode Trainer
+# LeetCode Dojo
 
 A Socratic DSA-interview trainer that runs **locally** and uses **your Claude Code
 subscription** (no API key) as the tutor/interviewer. It follows Striver's SDE

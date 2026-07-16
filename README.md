@@ -31,6 +31,26 @@ server-side streaming guard that caps code in guarded responses.
   Code session via `@anthropic-ai/claude-agent-sdk`. If a key is set it would be
   used instead; unset it to use your subscription.
 
+## AI providers & fallback
+
+Claude (via your Claude Code session) is the default and needs no key. But when
+your subscription hits its usage limit, every AI feature stops — so you can
+configure **fallback providers** that take over automatically:
+
+- Open **Settings** (gear icon, top-right) to add providers, paste API keys, pick
+  the primary, and set the fallback order. Keys are stored locally in your data
+  dir and never leave your machine.
+- Or set keys via environment variables (see `.env.example`) — an env var always
+  overrides a key stored in Settings.
+
+Supported out of the box: **Gemini** (multimodal — the whiteboard coach works),
+**OpenRouter** (free models like `qwen3-coder` / `deepseek`), **Groq**,
+**Cerebras**, **Mistral**, and any **custom OpenAI-compatible endpoint**
+(incl. self-hosted / Ollama). Model names are editable in Settings since free
+model slugs change often. When the primary is down, the app falls back to the
+next reachable provider before the first token — a banner shows which one is
+answering. The "never give the full answer" guard applies to every provider.
+
 ## Run it
 
 ### Web (fastest iteration)

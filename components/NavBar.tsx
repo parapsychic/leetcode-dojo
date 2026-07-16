@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { cn } from "@/lib/utils";
-import { LayoutDashboard, ListChecks, MessageSquareCode, GraduationCap, Compass } from "lucide-react";
+import { LayoutDashboard, ListChecks, MessageSquareCode, GraduationCap, Compass, Settings } from "lucide-react";
 
 const LINKS = [
   { href: "/", label: "Dashboard", icon: LayoutDashboard },
@@ -46,6 +46,19 @@ export function NavBar() {
             );
           })}
         </nav>
+        <Link
+          href="/settings"
+          aria-label="Settings"
+          title="AI providers & settings"
+          className={cn(
+            "ml-auto flex items-center gap-1.5 rounded-md px-3 py-1.5 text-sm transition-colors",
+            pathname.startsWith("/settings")
+              ? "bg-accent/15 text-accent"
+              : "text-muted hover:bg-card hover:text-foreground",
+          )}
+        >
+          <Settings size={15} />
+        </Link>
       </div>
     </header>
   );

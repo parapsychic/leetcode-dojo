@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { LayoutDashboard, ListChecks, MessageSquareCode, GraduationCap, Compass, Settings } from "lucide-react";
 
@@ -15,13 +16,24 @@ const LINKS = [
 
 export function NavBar() {
   const pathname = usePathname();
+
+  // Kick a rate-limited sync pull on app load; the server no-ops when sync is
+  // disabled or ran recently, so repeat mounts are free.
+  useEffect(() => {
+    fetch("/api/sync", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ action: "auto" }),
+    }).catch(() => {});
+  }, []);
+
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-background/80 backdrop-blur">
       <div className="mx-auto flex h-14 max-w-7xl items-center gap-6 px-4">
         <Link href="/" className="flex items-center gap-2 font-semibold tracking-tight">
-          <span className="grid h-7 w-7 place-items-center rounded-md bg-accent/20 text-accent">⛓️</span>
+          <span className="grid h-7 w-7 place-items-center rounded-md bg-accent/20 text-accent">🥋</span>
           <span>
-            dx <span className="text-accent">dbye</span>
+            LeetCode <span className="text-accent">Dojo</span>
           </span>
         </Link>
         <nav className="flex items-center gap-1 text-sm">

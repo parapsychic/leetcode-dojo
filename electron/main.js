@@ -1,4 +1,4 @@
-// Electron main process for dx dbye.
+// Electron main process for LeetCode Dojo.
 // Dev:  loads the running `next dev` server (http://localhost:3000).
 // Prod: spawns the bundled Next standalone server using Electron's own Node,
 //       then loads it. The standalone server runs all API routes (Claude Agent
@@ -106,7 +106,7 @@ async function createWindow() {
     minWidth: 940,
     minHeight: 640,
     backgroundColor: "#0b0f17",
-    title: "dx dbye",
+    title: "LeetCode Dojo",
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),

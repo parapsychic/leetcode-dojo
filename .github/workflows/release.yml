@@ -1,0 +1,183 @@
+# Release pipeline: on every merge to master/main it
+#   1. picks a semver bump from the conventional commits since the last tag
+#      (feat → minor, fix/other → patch, "!" or BREAKING CHANGE → major),
+#   2. commits the bump + tags vX.Y.Z, and writes release notes grouped by
+#      feat / fix from the commit subjects (enforced by .husky/commit-msg),
+#   3. builds the Electron installers on Windows / macOS / Linux and publishes
+#      them on a GitHub Release under that tag.
+#
+# Required repository secrets (Settings → Secrets and variables → Actions):
+#   FIREBASE_API_KEY, FIREBASE_AUTH_DOMAIN, FIREBASE_PROJECT_ID
+# They are inlined into the build via the NEXT_PUBLIC_FIREBASE_* env vars read
+# by lib/sync/firebaseProject.ts. Omitting them just builds without the shared
+# Firebase sync backend.
+
+name: Release
+
+on:
+  push:
+    branches: [master, main]
+
+permissions:
+  contents: write
+
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+env:
+  HUSKY: 0 # don't install git hooks in CI
+
+jobs:
+  version:
+    # The bump commit itself carries [skip ci]; this guard is a backstop so a
+    # manually pushed release commit can never loop the workflow.
+    if: ${{ !startsWith(github.event.head_commit.message, 'chore(release):') }}
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.bump.outputs.tag }}
+      version: ${{ steps.bump.outputs.version }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # full history + tags, needed for git describe/log
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Bump version and write release notes
+        id: bump
+        run: |
+          set -euo pipefail
+
+          last_tag=$(git describe --tags --abbrev=0 --match 'v*' 2>/dev/null || true)
+          if [ -n "$last_tag" ]; then
+            range="$last_tag..HEAD"
+          else
+            range="HEAD"
+          fi
+
+          subjects=$(git log --no-merges --pretty=format:'%s' "$range")
+          bodies=$(git log --no-merges --pretty=format:'%b' "$range")
+
+          bump=patch
+          if echo "$subjects" | grep -qE '^(feat|fix)(\([^)]*\))?!:' \
+             || echo "$bodies" | grep -q 'BREAKING CHANGE'; then
+            bump=major
+          elif echo "$subjects" | grep -qE '^feat(\([^)]*\))?:'; then
+            bump=minor
+          fi
+
+          version=$(npm version "$bump" --no-git-tag-version)
+          version=${version#v}
+          tag="v$version"
+          echo "Bump: $bump  ($last_tag -> $tag)"
+
+          # --- release notes, grouped by commit type ---------------------
+          breaking=$(echo "$subjects" | grep -E  '^(feat|fix)(\([^)]*\))?!:'   || true)
+          feats=$(   echo "$subjects" | grep -E  '^feat(\([^)]*\))?: '         || true)
+          fixes=$(   echo "$subjects" | grep -E  '^fix(\([^)]*\))?: '          || true)
+          others=$(  echo "$subjects" | grep -vE '^(feat|fix)(\([^)]*\))?!?: ' \
+                   | grep -v '^chore(release):' || true)
+
+          # "feat(sync): msg" -> "- **sync**: msg", "fix: msg" -> "- msg"
+          fmt() {
+            sed -E 's/^(feat|fix)\(([^)]+)\)!?: /**\2**: /; s/^(feat|fix)!?: //' \
+              | sed 's/^/- /'
+          }
+
+          {
+            echo "## $tag ($(date -u +%Y-%m-%d))"
+            echo ""
+            [ -n "$breaking" ] && { echo "### ⚠ Breaking changes"; echo ""; echo "$breaking" | fmt; echo ""; }
+            [ -n "$feats"    ] && { echo "### ✨ Features";         echo ""; echo "$feats"    | fmt; echo ""; }
+            [ -n "$fixes"    ] && { echo "### 🐛 Fixes";            echo ""; echo "$fixes"    | fmt; echo ""; }
+            [ -n "$others"   ] && { echo "### 🧹 Other";            echo ""; echo "$others"   | fmt; echo ""; }
+            if [ -n "$last_tag" ]; then
+              echo "**Full changelog**: https://github.com/${GITHUB_REPOSITORY}/compare/${last_tag}...${tag}"
+            fi
+          } > RELEASE_NOTES.md
+
+          cat RELEASE_NOTES.md
+
+          echo "tag=$tag"         >> "$GITHUB_OUTPUT"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Commit bump and push tag
+        run: |
+          set -euo pipefail
+          tag="${{ steps.bump.outputs.tag }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add package.json package-lock.json
+          git commit -m "chore(release): $tag [skip ci]"
+          git tag -a "$tag" -m "$tag"
+          git push origin "HEAD:${GITHUB_REF_NAME}" --follow-tags
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-notes
+          path: RELEASE_NOTES.md
+
+  build:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            installer: dist-electron/*.exe
+          - os: macos-latest
+            installer: dist-electron/*.dmg
+          - os: ubuntu-latest
+            installer: dist-electron/*.AppImage
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.version.outputs.tag }} # build exactly what was tagged
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      - name: Build installers
+        env:
+          NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
+          NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
+          NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
+          # unsigned builds; flip when signing certs are configured
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+        run: npm run electron:build -- --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: installers-${{ matrix.os }}
+          path: ${{ matrix.installer }}
+          if-no-files-found: error
+
+  publish:
+    needs: [version, build]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: installers-*
+          path: dist
+          merge-multiple: true
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: release-notes
+          path: notes
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ needs.version.outputs.tag }}
+          name: ${{ needs.version.outputs.tag }}
+          body_path: notes/RELEASE_NOTES.md
+          files: dist/*

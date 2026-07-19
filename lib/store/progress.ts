@@ -1,6 +1,7 @@
 import { promises as fs } from "fs";
 import path from "path";
 import { dataDir } from "./paths";
+import { mergeProgress } from "@/lib/sync/merge";
 
 // ---- Types ----
 
@@ -32,6 +33,8 @@ export interface Streak {
 
 export interface ProgressData {
   version: 1;
+  /** ISO timestamp of the last local mutation; used by sync for merge ordering. */
+  updatedAt?: string;
   profile: { name: string };
   problems: Record<string, ProblemProgress>;
   quizResults: QuizResult[];
@@ -81,6 +84,7 @@ async function mutate(
   const run = async () => {
     const data = await readData();
     await fn(data);
+    data.updatedAt = new Date().toISOString();
     await writeData(data);
     return data;
   };
@@ -165,7 +169,8 @@ export async function recordQuiz(
   return mutate((d) => {
     d.quizResults.unshift({
       ...result,
-      id: `${Date.now()}`,
+      // Random suffix keeps ids collision-free when results merge across devices.
+      id: `${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
       takenAt: new Date().toISOString(),
     });
     d.quizResults = d.quizResults.slice(0, 100);
@@ -176,5 +181,30 @@ export async function recordQuiz(
 export async function setProfileName(name: string): Promise<ProgressData> {
   return mutate((d) => {
     d.profile.name = name.trim().slice(0, 40);
+  });
+}
+
+// ---- Sync / import support ----
+// Both go through mutate() so they serialize against normal app writes.
+// The callback must assign field-by-field: mutate persists the same `d` object.
+
+/** Overwrite the whole document (caller validates the input). */
+export async function replaceProgress(next: ProgressData): Promise<ProgressData> {
+  return mutate((d) => {
+    d.profile = { name: next.profile.name };
+    d.problems = next.problems;
+    d.quizResults = next.quizResults;
+    d.streak = next.streak;
+  });
+}
+
+/** Field-level merge of an incoming doc (remote sync / import) into local. */
+export async function mergeIntoProgress(incoming: ProgressData): Promise<ProgressData> {
+  return mutate((d) => {
+    const merged = mergeProgress(d, incoming);
+    d.profile = merged.profile;
+    d.problems = merged.problems;
+    d.quizResults = merged.quizResults;
+    d.streak = merged.streak;
   });
 }

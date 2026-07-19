@@ -9,7 +9,7 @@ const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "dx dbye",
+  title: "LeetCode Dojo",
   description: "A Socratic DSA-interview trainer powered by your Claude Code session.",
 };
 

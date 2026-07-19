@@ -7,6 +7,7 @@ import {
   recordQuiz,
   setProfileName,
 } from "@/lib/store/progress";
+import { scheduleSync } from "@/lib/sync/engine";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -31,23 +32,27 @@ export async function POST(req: NextRequest) {
     return Response.json({ error: "bad_request" }, { status: 400 });
   }
 
+  const done = (data: unknown) => {
+    // Debounced push to the sync backend; adds nothing to the response time.
+    scheduleSync();
+    return Response.json(data);
+  };
+
   switch (body.action) {
     case "hint":
       if (!body.problemId) break;
-      return Response.json(await recordHint(body.problemId));
+      return done(await recordHint(body.problemId));
     case "attempt":
       if (!body.problemId) break;
-      return Response.json(await recordAttempt(body.problemId));
+      return done(await recordAttempt(body.problemId));
     case "solved":
       if (!body.problemId) break;
-      return Response.json(
-        await recordSolved(body.problemId, body.elapsedMs ?? null),
-      );
+      return done(await recordSolved(body.problemId, body.elapsedMs ?? null));
     case "quiz":
       if (!body.quiz) break;
-      return Response.json(await recordQuiz(body.quiz));
+      return done(await recordQuiz(body.quiz));
     case "profile":
-      return Response.json(await setProfileName(body.name ?? ""));
+      return done(await setProfileName(body.name ?? ""));
   }
   return Response.json({ error: "bad_action" }, { status: 400 });
 }

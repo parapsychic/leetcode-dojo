@@ -9,5 +9,5 @@ export function dataDir(): string {
   if (process.env.NODE_ENV !== "production") {
     return path.join(process.cwd(), ".data");
   }
-  return path.join(os.tmpdir(), "dx-dbye");
+  return path.join(os.tmpdir(), "leetcode-dojo");
 }

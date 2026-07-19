@@ -1,0 +1,32 @@
+# Server-side twin of the local .husky/commit-msg hook: every commit on a PR
+# must be "(feat|fix)(optional-module): description" — the format the release
+# workflow parses for version bumps and release notes. Same rules, same script
+# (scripts/verify-commit-msg.mjs), so they can't drift.
+
+name: Commit lint
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened]
+
+permissions:
+  contents: read
+
+jobs:
+  commitlint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # need the base branch to diff the commit range
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Lint PR commit subjects
+        run: |
+          set -euo pipefail
+          git log --no-merges --pretty=format:'%s' \
+            "origin/${{ github.base_ref }}..${{ github.event.pull_request.head.sha }}" \
+            | node scripts/verify-commit-msg.mjs --stdin

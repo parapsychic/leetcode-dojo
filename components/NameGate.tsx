@@ -50,7 +50,7 @@ export function NameGate() {
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
       <div className="mx-4 w-full max-w-sm rounded-2xl border border-border bg-card p-6 shadow-2xl">
-        <div className="mb-1 text-lg font-semibold">Welcome to dx dbye 👋</div>
+        <div className="mb-1 text-lg font-semibold">Welcome to LeetCode Dojo 👋</div>
         <p className="mb-4 text-sm text-muted">
           What should we call you? This personalizes your dashboard and the
           interviewer.

@@ -1,6 +1,6 @@
 @AGENTS.md
 
-# LeetCode Dojo (`dx-dbye`)
+# LeetCode Dojo (`leetcode-dojo`)
 
 A locally-run, Socratic DSA-interview trainer. It follows Striver's SDE Sheet and,
 crucially, uses **your local Claude Code session as the default LLM** (via

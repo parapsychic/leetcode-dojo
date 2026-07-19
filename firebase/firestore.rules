@@ -1,0 +1,27 @@
+rules_version = '2';
+
+// Security rules for the shared LeetCode Dojo sync project.
+// Deny-all by default; each signed-in user may only touch their single
+// progress doc at users/{uid}/data/main, and only with the expected shape
+// and a ~900KB size cap (Firestore's own hard limit is 1MB).
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{uid}/data/main {
+      allow get: if request.auth != null && request.auth.uid == uid;
+      allow delete: if request.auth != null && request.auth.uid == uid;
+      allow create, update: if request.auth != null
+        && request.auth.uid == uid
+        && request.resource.data.keys().hasOnly(['blob', 'updatedAt'])
+        && request.resource.data.blob is string
+        && request.resource.data.blob.size() < 900000
+        && request.resource.data.updatedAt is string
+        && request.resource.data.updatedAt.size() < 64;
+    }
+
+    // Everything else (including listing other users) is denied.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

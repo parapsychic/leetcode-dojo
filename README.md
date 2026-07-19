@@ -86,7 +86,7 @@ a window. Progress is stored per-user in Electron's `userData` directory.
   `Cannot create symbolic link`, enable Developer Mode (Settings → For developers)
   or run the build from an elevated terminal once.
 - To build just the runnable app folder without an installer (no signing toolchain):
-  `npx electron-builder --win --dir` → `dist-electron/win-unpacked/dx dbye.exe`.
+  `npx electron-builder --win --dir` → `dist-electron/win-unpacked/LeetCode Dojo.exe`.
 - The installer doesn't bundle Claude Code — it's a separate dependency that
   provides the auth and model. The in-app banner tells you if your session is
   unavailable.

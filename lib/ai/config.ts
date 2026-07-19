@@ -7,6 +7,7 @@ import { promises as fs } from "fs";
 import path from "path";
 import { dataDir } from "@/lib/store/paths";
 import type { ProviderId } from "./types";
+import type { SyncSettings } from "@/lib/sync/config";
 import { ALL_PROVIDER_IDS, envKeyFor, labelFor, presetFor } from "./presets";
 
 export interface StoredProviderOverride {
@@ -23,6 +24,8 @@ export interface AiSettings {
   activeProvider: ProviderId;
   fallbackChain: ProviderId[];
   providers: Partial<Record<ProviderId, StoredProviderOverride>>;
+  /** Progress-sync configuration (see lib/sync/config.ts). Optional for old files. */
+  sync?: Partial<SyncSettings>;
 }
 
 // Fully-resolved config the router/providers actually use.

@@ -18,7 +18,9 @@
 /out/
 
 # production
-/build
+/build/*
+# ...but keep the committed electron-builder app icon (buildResources).
+!/build/icon.png
 
 # electron build output (installers + unpacked app)
 /dist-electron/

@@ -6,6 +6,10 @@ import { AlertTriangle, Loader2 } from "lucide-react";
 
 interface AuthState {
   ok: boolean;
+  /** True when running as a Linux AppImage, which can't reach the natively
+   *  installed Claude Code — the messages below explain that instead of the
+   *  generic "run /login" advice. */
+  isAppImage?: boolean;
   activeProvider?: string;
   servedBy?: string;
   servedByLabel?: string;
@@ -41,7 +45,11 @@ export function AuthBanner() {
             <span>
               Using fallback provider{" "}
               <strong>{info.servedByLabel ?? info.servedBy}</strong> —{" "}
-              {info.activeProviderLabel ?? info.activeProvider} is unavailable.
+              {info.activeProviderLabel ?? info.activeProvider} is unavailable
+              {info.isAppImage && info.activeProvider === "claude"
+                ? " (AppImage builds can't use your local Claude Code — install the .deb/.rpm/pacman package for that)"
+                : ""}
+              .
             </span>
             <Link href="/settings" className="underline underline-offset-2">
               Settings
@@ -71,15 +79,28 @@ export function AuthBanner() {
         ) : (
           <>
             <AlertTriangle size={15} />
-            <span>
-              No AI provider is reachable. Open Claude Code and run{" "}
-              <code className="rounded bg-black/30 px-1">/login</code>, or add a
-              fallback provider in{" "}
-              <Link href="/settings" className="underline underline-offset-2">
-                Settings
-              </Link>
-              . The tutor features need one.
-            </span>
+            {info?.isAppImage ? (
+              <span>
+                No AI provider is reachable. You&apos;re running the AppImage
+                build, which can&apos;t use the Claude Code installed on your
+                system — install the .deb, .rpm, or Arch (.pacman) package from
+                the releases page, or add an API-key provider in{" "}
+                <Link href="/settings" className="underline underline-offset-2">
+                  Settings
+                </Link>
+                . The tutor features need one.
+              </span>
+            ) : (
+              <span>
+                No AI provider is reachable. Open Claude Code and run{" "}
+                <code className="rounded bg-black/30 px-1">/login</code>, or add
+                a fallback provider in{" "}
+                <Link href="/settings" className="underline underline-offset-2">
+                  Settings
+                </Link>
+                . The tutor features need one.
+              </span>
+            )}
           </>
         )}
       </div>

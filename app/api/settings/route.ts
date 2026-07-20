@@ -55,6 +55,10 @@ export async function GET() {
   // hasToken/signedIn booleans (plus whether an env var supplies the value).
   const sync = resolveSync(normalizeSync(settings.sync));
   return Response.json({
+    // Inherited from the Electron main process when running as an AppImage
+    // (which can't use the natively installed Claude Code) — Settings shows
+    // a warning suggesting the .deb/.rpm/.pacman build or a fallback provider.
+    isAppImage: Boolean(process.env.APPIMAGE),
     activeProvider: settings.activeProvider,
     fallbackChain: settings.fallbackChain,
     providers,

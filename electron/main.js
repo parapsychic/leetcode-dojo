@@ -99,6 +99,12 @@ async function startProdServer() {
   return url;
 }
 
+// dojo.png ships as extraResources (app/public) when packaged and lives in the
+// repo's public/ during dev; used as the runtime window/taskbar icon.
+const WINDOW_ICON = isDev
+  ? path.join(__dirname, "..", "public", "dojo.png")
+  : path.join(process.resourcesPath, "app", "public", "dojo.png");
+
 async function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -107,6 +113,7 @@ async function createWindow() {
     minHeight: 640,
     backgroundColor: "#0b0f17",
     title: "LeetCode Dojo",
+    icon: WINDOW_ICON,
     autoHideMenuBar: true,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),

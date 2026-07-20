@@ -6,6 +6,11 @@ directories:
   output: dist-electron
   buildResources: build
 
+# App icon: build/icon.png (square PNG derived from public/dojo.png) is
+# auto-detected from buildResources and referenced explicitly per platform
+# below. electron-builder generates the Windows .ico, macOS .icns, and the
+# Linux icon set from it.
+
 # Only the Electron shell goes into the asar. The actual Next app (server +
 # its traced node_modules) ships as extraResources and runs as a child process,
 # so we exclude node_modules from the asar to keep it small.
@@ -25,6 +30,7 @@ extraResources:
 asar: true
 
 win:
+  icon: build/icon.png
   target:
     - nsis
   artifactName: ${productName}-Setup-${version}.${ext}
@@ -36,9 +42,20 @@ nsis:
   createDesktopShortcut: true
 
 mac:
+  icon: build/icon.png
   target: dmg
   category: public.app-category.developer-tools
 
+# Native packages (deb/rpm/pacman) are preferred on Linux: the AppImage's
+# bundled runtime can't reach the natively installed Claude Code, so the app
+# shows an in-app warning when it detects it's running from an AppImage.
 linux:
-  target: AppImage
+  icon: build/icon.png
+  target:
+    - AppImage
+    - deb
+    - rpm
+    - pacman
   category: Development
+  synopsis: Socratic DSA interview trainer
+  artifactName: ${name}-${version}.${ext}

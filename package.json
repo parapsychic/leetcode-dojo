@@ -1,6 +1,6 @@
 {
   "name": "leetcode-dojo",
-  "version": "0.2.0",
+  "version": "0.2.1",
   "private": true,
   "description": "Socratic DSA interview trainer that runs on your local Claude Code session",
   "author": {

@@ -36,6 +36,8 @@ Requirements: Node 20+, Claude Code installed and logged in, and
 - `lib/store/` — the JSON progress store (`progress.ts`) and data-dir resolution (`paths.ts`).
 - `lib/cache/diskCache.ts` — generic namespaced JSON disk cache (hashed keys).
 - `lib/data/` — the curated Striver sheet + GFG problem statements.
+- `lib/companion/` + `components/companion/` — the companion character (see below).
+- `public/characters/<id>/` — character packs (data, not code; see below).
 - `electron/` — desktop shell (`main.js` boots the standalone server; sets `EFDX_DATA_DIR`).
 
 ## The AI layer (`lib/ai/`) — read this before touching model calls
@@ -81,12 +83,71 @@ Anthropic-specific, so any provider can serve it and the guard protects all of t
   `GET /api/settings` redacts keys to a `hasKey` boolean. `.data/` is gitignored.
 - **Images** only go to vision-capable providers; text-only providers get a note.
 
+## The companion (`lib/companion/`) — the character at the bottom of the screen
+
+A character (Makise Kurisu by default) is docked on every page: she greets you,
+reacts to solves/verdicts/streaks, nudges when you stall, and replies when you
+type back. She is **the mascot, not the tutor** — see the invariants below.
+
+**Characters are data.** A *pack* is `public/characters/<id>/`: `character.json`
+(persona, speech style, `expressions[]`, `eventLines` — 3-5 canned templated lines
+per event, `{name}`/`{title}`/`{score}` slots), `sprites/`, `voice/`. The app only
+ever *reads* packs; nothing about Kurisu is hardcoded. That boundary exists so a
+separate project can automate pack creation (auto-rig an arbitrary character image,
+draft a persona, clone a voice) without touching this code — the hand-assembled
+Kurisu pack is the reference output. Art and audio are gitignored; `character.json`
+is not.
+
+- **`pack.ts`** — zod schema + `loadCharacterPack(id)`. Reads from `process.cwd()/public`
+  (correct in dev *and* the packaged Electron standalone build) and **fs-probes every
+  sprite variant**, so the client never 404-spams for art that isn't there. Served by
+  `GET /api/companion/pack` — the one seam to change if packs later move to `dataDir()`.
+- **`bus.ts`** — a module-level typed pub/sub (`emitCompanionEvent`/`subscribeCompanion`)
+  with a 10-event/5s replay buffer, plus `noteActivity()` for quiet-while-typing. It
+  exists because the app has **no global client state** and the root layout is a server
+  component: a context provider would push a client boundary through every page to serve
+  one widget. Emitters (`SolveView`, `QuizRunner`) and the widget share one browser bundle,
+  so a singleton is sufficient; the replay buffer also makes HMR re-instantiation benign.
+- **`director.ts`** — pure policy: chattiness presets (min gap / hourly cap / routine
+  probability), quiet-while-typing (defer once, then drop), one-line-at-a-time, and the
+  canned-vs-LLM routing table. Also builds the `eventSummary` strings — **from event
+  fields only**.
+- **`useCompanionBrain.ts`** — event → `decide()` → canned line or `companion` mode call.
+  Owns the message list, which is the single source of truth for what renders, what
+  persists (`sessionStorage`), and what the model receives as prior turns.
+- **`playLine.ts`** — the delivery seam. v1 reveals text (~32 chars/s) and flaps the mouth
+  procedurally; the phase-2 voice path is a branch here (`voice/<sha256(text)[:16]>.wav`,
+  mouth driven by WebAudio amplitude). The sprite and bubble never learn which driver ran.
+- **`components/companion/`** — `CompanionWidget` (mounted in `app/layout.tsx` as a client
+  island so it survives route changes; `z-40`, under `NameGate`'s `z-50`), `CompanionSprite`
+  (expression crossfade, blink loop, idle sway, mouth flap), `SpeechBubble` (conversation +
+  reply input).
+
+### Companion invariants to preserve
+
+- **She cannot leak solutions.** The `companion` prompt mode receives *only* persona +
+  event summary + chat history — never `code`, `problemStatement`, or review text. Never
+  enrich `eventSummary` with problem content. She's also in `GUARDED_MODES` as a backstop,
+  and the persona instructs an in-character refusal that redirects to Hints/Coach.
+- **Routine chatter costs no tokens.** Canned pack lines for greetings/problem opens/hints/
+  ordinary solves; the model is for context-rich moments and user replies only. She stays
+  out of `HEAVY_MODES` (light tier) and *in* `UNCACHED_MODES` (repeated banter is worse than
+  none). A companion-only `provider`/`model` override in settings keeps banter off the
+  tutoring budget; a rate limiter in `app/api/claude/route.ts` backstops the client director.
+- **The coach is absorbed, not duplicated.** When the companion is enabled, `SolveView` passes
+  `ctx.personaStyle` into its *existing* coach call and routes the result to the bus — one
+  LLM call, same escalation ladder, same guard. Disabled → the old `CoachToast` returns.
+- **Every failure degrades to silence, never an error.** A failed/rate-limited call falls back
+  to a canned line; a missing sprite variant falls back to the base, then to an avatar chip;
+  an unparseable `[expression]` tag falls back to `neutral`.
+
 ## Persistence
 
 Everything lives under `dataDir()` (`lib/store/paths.ts`): project-local `.data/`
 in dev, Electron `userData` when packaged, OS tmp otherwise.
 - `progress.json` — solve status, streak, quiz results (serialized atomic writes).
-- `settings.json` — AI provider config (active/chain/keys/models).
+- `settings.json` — AI provider config (active/chain/keys/models), plus optional
+  `sync` and `companion` blocks. Both are optional for old files and normalized on read.
 - `cache/<namespace>/` — disk cache for `leetcode` statements, `llm` responses, `models`.
 
 ## Gotchas
@@ -97,3 +158,19 @@ in dev, Electron `userData` when packaged, OS tmp otherwise.
 - The `ask` mode is used as a lightweight health probe.
 - When adding a provider: add a preset, add its id to the `ProviderId` union, and it
   flows through `openaiCompat` automatically — no router changes needed.
+- The companion greets **once per browser session** (`sessionStorage`), so a refresh
+  won't re-greet — which means the conversation can legitimately be empty. Panel
+  open/closed state is derived from "did something arrive after the last collapse"
+  **or** an explicit open; drop the second half and clicking her does nothing when
+  the history is empty.
+- Companion message ids must resume past restored history (`lineIdRef` seeds from the
+  max restored id) — reusing an id makes a new line overwrite an old one, since
+  messages are patched by id.
+- Known gaps: no UI to pick a character (`companion.characterId` works, but nothing
+  lists installed packs), and chat history uses one global `sessionStorage` key rather
+  than a per-character one, so switching characters would inherit the previous one's
+  conversation.
+- Verifying UI work: there is no test suite and no browser driver installed. Drive the
+  running dev server with Chrome over the DevTools Protocol (headless Chrome +
+  `--remote-debugging-port`, Node 22's native `WebSocket`) — that is how the two
+  companion bugs above were caught, and neither surfaced as a console error.

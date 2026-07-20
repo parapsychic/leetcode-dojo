@@ -17,7 +17,7 @@ const JSON_MODES: ClaudeMode[] = ["quiz", "visualize", "coachPlan", "daily"];
 // else (learning, stub generation, review, hints, quizzes…) is deterministic for
 // a given input, so identical requests are served from disk instead of re-calling
 // the model.
-const UNCACHED_MODES: ClaudeMode[] = ["interview", "coach"];
+const UNCACHED_MODES: ClaudeMode[] = ["interview", "coach", "companion"];
 const LLM_CACHE_NS = "llm";
 const LLM_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 
@@ -41,6 +41,22 @@ function llmCacheKey(
 interface Body {
   mode: ClaudeMode;
   ctx: PromptContext;
+}
+
+// Defense-in-depth cap on companion banter (the client's director already
+// rate-limits itself): a simple sliding window, per server process.
+const COMPANION_WINDOW_MS = 60_000;
+const COMPANION_MAX_PER_WINDOW = 12;
+const companionCalls: number[] = [];
+
+function companionRateLimited(): boolean {
+  const now = Date.now();
+  while (companionCalls.length && now - companionCalls[0] > COMPANION_WINDOW_MS) {
+    companionCalls.shift();
+  }
+  if (companionCalls.length >= COMPANION_MAX_PER_WINDOW) return true;
+  companionCalls.push(now);
+  return false;
 }
 
 function authErrorResponse(message: string) {
@@ -78,6 +94,9 @@ export async function POST(req: NextRequest) {
   }
   const { mode, ctx } = body;
   if (!mode) return Response.json({ error: "missing_mode" }, { status: 400 });
+  if (mode === "companion" && companionRateLimited()) {
+    return Response.json({ error: "companion_rate" }, { status: 429 });
+  }
 
   const cacheable = isCacheable(mode);
   // Primary candidate signature for cache *reads*.

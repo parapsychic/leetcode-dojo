@@ -5,11 +5,12 @@
 import { ALL_PROVIDER_IDS, labelFor } from "@/lib/ai/presets";
 import { ALL_SYNC_BACKEND_IDS, SYNC_PRESETS } from "@/lib/sync/presets";
 
-export type SectionId = "providers" | "sync" | "data" | "profile";
+export type SectionId = "providers" | "sync" | "companion" | "data" | "profile";
 
 export const SECTIONS: { id: SectionId; title: string }[] = [
   { id: "providers", title: "AI Providers" },
   { id: "sync", title: "Sync" },
+  { id: "companion", title: "Companion" },
   { id: "data", title: "Data" },
   { id: "profile", title: "Profile" },
 ];
@@ -60,6 +61,24 @@ export const SETTINGS_INDEX: IndexRow[] = [
   ...PROVIDER_ROWS,
   ...SYNC_ROWS,
   {
+    sectionId: "companion",
+    rowId: "companion:enable",
+    label: "Enable companion",
+    keywords: ["companion", "character", "kurisu", "widget", "anime", "assistant", "mascot", "buddy"],
+  },
+  {
+    sectionId: "companion",
+    rowId: "companion:chattiness",
+    label: "Chattiness",
+    keywords: ["companion", "chattiness", "quiet", "chatty", "frequency", "talk", "banter"],
+  },
+  {
+    sectionId: "companion",
+    rowId: "companion:model",
+    label: "Companion model",
+    keywords: ["companion", "model", "provider", "gemini", "free", "override", "banter"],
+  },
+  {
     sectionId: "data",
     rowId: "data:export",
     label: "Export progress",
@@ -94,6 +113,7 @@ export function matchQuery(query: string): SearchMatch | null {
   const countsBySection: Record<SectionId, number> = {
     providers: 0,
     sync: 0,
+    companion: 0,
     data: 0,
     profile: 0,
   };

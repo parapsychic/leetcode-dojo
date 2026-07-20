@@ -4,6 +4,7 @@ import "./globals.css";
 import { NavBar } from "@/components/NavBar";
 import { AuthBanner } from "@/components/AuthBanner";
 import { NameGate } from "@/components/NameGate";
+import { CompanionWidget } from "@/components/companion/CompanionWidget";
 
 const geistSans = Geist({ variable: "--font-geist-sans", subsets: ["latin"] });
 const geistMono = Geist_Mono({ variable: "--font-geist-mono", subsets: ["latin"] });
@@ -26,6 +27,7 @@ export default function RootLayout({
         <AuthBanner />
         <main className="flex-1">{children}</main>
         <NameGate />
+        <CompanionWidget />
       </body>
     </html>
   );

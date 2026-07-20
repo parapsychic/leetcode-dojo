@@ -18,6 +18,7 @@ import {
   resolveSync,
   SYNC_ENV,
 } from "@/lib/sync/config";
+import { isChattiness, normalizeCompanion } from "@/lib/companion/config";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -58,6 +59,7 @@ export async function GET() {
     activeProvider: settings.activeProvider,
     fallbackChain: settings.fallbackChain,
     providers,
+    companion: normalizeCompanion(settings.companion),
     sync: {
       enabled: sync.enabled,
       backend: sync.backend,
@@ -99,12 +101,22 @@ interface SyncSaveBody {
   cloudflare?: { url?: string; token?: string };
 }
 
+interface CompanionSaveBody {
+  enabled?: boolean;
+  chattiness?: string;
+  characterId?: string;
+  // Provider override: a ProviderId sets it, null/"" clears it, undefined leaves untouched.
+  provider?: string | null;
+  model?: string | null;
+}
+
 interface SaveBody {
   action: "save";
   activeProvider?: ProviderId;
   fallbackChain?: ProviderId[];
   providers?: Partial<Record<ProviderId, StoredProviderOverride>>;
   sync?: SyncSaveBody;
+  companion?: CompanionSaveBody;
 }
 
 interface TestBody {
@@ -184,6 +196,24 @@ export async function POST(req: NextRequest) {
           }
         }
         // firebase credentials are managed by /api/sync (signin/signout), not here.
+      }
+      if (body.companion) {
+        const inc = body.companion;
+        const cur = (s.companion ??= {});
+        if (inc.enabled !== undefined) cur.enabled = Boolean(inc.enabled);
+        if (inc.chattiness !== undefined && isChattiness(inc.chattiness)) {
+          cur.chattiness = inc.chattiness;
+        }
+        if (inc.characterId !== undefined) {
+          const id = String(inc.characterId).trim();
+          if (id) cur.characterId = id;
+        }
+        if (inc.provider !== undefined) {
+          cur.provider = isProviderId(inc.provider) ? inc.provider : null;
+        }
+        if (inc.model !== undefined) {
+          cur.model = typeof inc.model === "string" && inc.model.trim() ? inc.model.trim() : null;
+        }
       }
     });
     return Response.json({ ok: true, activeProvider: updated.activeProvider });

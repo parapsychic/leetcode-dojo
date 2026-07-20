@@ -13,7 +13,8 @@ export type ClaudeMode =
   | "ask"
   | "stub"
   | "coach"
-  | "coachPlan";
+  | "coachPlan"
+  | "companion";
 
 export type CoachIntensity = "gentle" | "balanced" | "assertive";
 
@@ -41,6 +42,16 @@ export interface PromptContext {
   // Optional image input (e.g. the whiteboard sketch), base64 without data: prefix.
   imageBase64?: string;
   imageMediaType?: "image/png" | "image/jpeg" | "image/webp";
+  // Companion mode: persona comes from the character pack, and the context is a
+  // deliberately starved event summary — never code, statements, or review text —
+  // so the companion cannot leak what the tutor is withholding.
+  persona?: string;
+  speechStyle?: string;
+  expressionList?: string[];
+  eventSummary?: string;
+  userName?: string;
+  // Coach mode: when set, the coach speaks as this character (companion absorption).
+  personaStyle?: string;
 }
 
 const NEVER_SOLVE = `Absolute rule: NEVER write the full or near-full solution, and never write the core algorithm in code. You may reference tiny, generic snippets (a loop skeleton, a data-structure declaration) but never the lines that constitute the actual answer. If asked directly for the solution, refuse warmly and give the next nudge instead. Your job is to make the learner arrive at it themselves.`;
@@ -220,7 +231,11 @@ ${
 }
 Keep it to 1-3 sentences, friendly and human. Do NOT restate the whole problem.
 CRITICAL — escalate help SLOWLY. Do NOT be too helpful early; a learner who has barely started should get almost nothing but a question. ${rung}
-If a whiteboard sketch image is provided, look at it and react to what they actually drew. ${NEVER_SOLVE}`;
+If a whiteboard sketch image is provided, look at it and react to what they actually drew. ${NEVER_SOLVE}${
+        ctx.personaStyle
+          ? `\n\nVOICE: deliver your message in this character's voice — ${ctx.personaStyle}`
+          : ""
+      }`;
       const elapsed = ctx.elapsedMinutes ?? 0;
       const idle = ctx.idleSeconds ?? 0;
       const diffBlock = ctx.codeDiff
@@ -241,6 +256,28 @@ ${diffBlock}${transcriptBlock(ctx) ? `Coach chat so far:\n${transcriptBlock(ctx)
       return { system, prompt };
     }
 
+    case "companion": {
+      const expressions = ctx.expressionList?.length
+        ? ctx.expressionList
+        : ["neutral"];
+      const system = `${ctx.persona || "You are a witty study companion."}
+Speech style: ${ctx.speechStyle || "1-3 short sentences, conversational, no markdown."}
+
+You are the COMPANION widget in a coding-practice app — the mascot, NOT the tutor. Hard rules:
+- You do not know the problems' contents or solutions, and you NEVER discuss approaches, algorithms, data structures, complexity, or code. If asked for any of that, refuse in character (tease them) and point them to the Hints tab or the Coach instead.
+- Keep it to 1-3 short sentences. No markdown, no emoji, no roleplay actions in asterisks.
+- Output contract: your reply MUST start with exactly one expression tag from [${expressions.join("|")}] followed by the spoken line. Example: "[smug] Hmph. Obviously."`;
+      const prompt = `The learner's name: ${ctx.userName || "(unknown — don't invent one)"}.
+${ctx.eventSummary ? `What just happened in the app: ${ctx.eventSummary}\n` : ""}${
+        transcriptBlock(ctx) ? `Recent banter:\n${transcriptBlock(ctx)}\n\n` : ""
+      }${
+        ctx.userMessage
+          ? `They just said to you: ${ctx.userMessage}\n\nReply in character.`
+          : "React in character with one line."
+      }`;
+      return { system, prompt };
+    }
+
     case "ask": {
       const system = `You are a helpful DSA mentor answering the learner's question about the problem or concept they're working on. Be concise and clear. If they ask you to just give the answer to the coding problem, decline warmly and instead give the smallest helpful nudge. ${NEVER_SOLVE}`;
       const prompt = `${problemBlock(ctx)}
@@ -252,4 +289,11 @@ ${transcriptBlock(ctx) ? `Conversation so far:\n${transcriptBlock(ctx)}\n\n` : "
 }
 
 // Modes whose streamed text must be guarded against leaking a full solution.
-export const GUARDED_MODES: ClaudeMode[] = ["hint", "interview", "ask", "review", "coach"];
+export const GUARDED_MODES: ClaudeMode[] = [
+  "hint",
+  "interview",
+  "ask",
+  "review",
+  "coach",
+  "companion",
+];

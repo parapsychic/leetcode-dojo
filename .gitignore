@@ -48,4 +48,6 @@ yarn-error.log*
 next-env.d.ts
 
 .claude/
-
+docs/
+public/characters/*/sprites/
+public/characters/*/voice/

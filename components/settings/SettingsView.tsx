@@ -11,8 +11,10 @@ import { matchQuery, type SectionId } from "./searchIndex";
 import { SettingsNav, SettingsSearch, SettingsSection } from "./primitives";
 import { ProvidersSection, type ModelListState } from "./ProvidersSection";
 import { SyncSection, type SyncFormState, type SyncTokenKey } from "./SyncSection";
+import { CompanionSection, type CompanionFormState } from "./CompanionSection";
 import { DataSection } from "./DataSection";
 import { ProfileSection } from "./ProfileSection";
+import { emitCompanionSettingsChanged } from "@/lib/companion/bus";
 import type {
   ProviderRow,
   SettingsPayload,
@@ -35,6 +37,16 @@ function orderRows(data: SettingsPayload): ProviderRow[] {
     if (!seen.has(p.id)) out.push(p);
   }
   return out;
+}
+
+function companionFormFrom(d: SettingsPayload): CompanionFormState {
+  return {
+    enabled: d.companion.enabled,
+    chattiness: d.companion.chattiness,
+    characterId: d.companion.characterId,
+    provider: d.companion.provider,
+    model: d.companion.model,
+  };
 }
 
 function syncFormFrom(d: SettingsPayload): SyncFormState {
@@ -65,6 +77,9 @@ export function SettingsView() {
   const [syncTest, setSyncTest] = useState<TestState>({});
   const [syncStatus, setSyncStatus] = useState<SyncStatusPayload | null>(null);
   const [syncingNow, setSyncingNow] = useState(false);
+
+  // ---- Companion state ----
+  const [companionForm, setCompanionForm] = useState<CompanionFormState | null>(null);
 
   // ---- Shell state ----
   const [query, setQuery] = useState("");
@@ -97,6 +112,7 @@ export function SettingsView() {
         if (!alive) return;
         applyPayload(d);
         setSyncForm(syncFormFrom(d));
+        setCompanionForm(companionFormFrom(d));
         setSyncStatus(s);
         setLoading(false);
       })
@@ -189,6 +205,7 @@ export function SettingsView() {
       fallbackChain: rows.map((r) => r.id),
       providers,
       ...(sync ? { sync } : {}),
+      ...(companionForm ? { companion: companionForm } : {}),
     };
   }
 
@@ -208,6 +225,9 @@ export function SettingsView() {
         // Refresh redacted view (hasKey/hasToken flags etc.)
         const d = await refetchSettings();
         setSyncForm(syncFormFrom(d));
+        setCompanionForm(companionFormFrom(d));
+        // Tell the live widget so it reacts without a reload.
+        emitCompanionSettingsChanged();
         // A newly-saved key unlocks the full model list — reload expanded cards.
         for (const id of Object.keys(expanded)) {
           if (expanded[id] && id !== "claude") loadModels(id, true);
@@ -415,6 +435,31 @@ export function SettingsView() {
                 onSyncNow={syncNow}
                 onFirebaseAuth={firebaseAuth}
                 onFirebaseSignOut={firebaseSignOut}
+              />
+            )}
+          </SettingsSection>
+
+          <SettingsSection
+            id="companion"
+            title="Companion"
+            blurb="Your study companion — she lives at the bottom of the screen, cheers you on, teases your mistakes, and never spoils a solution."
+            match={match}
+            active={section}
+          >
+            {companionForm && (
+              <CompanionSection
+                form={companionForm}
+                providers={rows}
+                modelList={
+                  companionForm.provider ? (modelLists[companionForm.provider] ?? null) : null
+                }
+                match={match}
+                query={query}
+                onForm={(patch) => {
+                  setCompanionForm((f) => (f ? { ...f, ...patch } : f));
+                  setSaved(false);
+                }}
+                onLoadModels={(id, fresh) => loadModels(id, fresh)}
               />
             )}
           </SettingsSection>

@@ -5,6 +5,7 @@ import { CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui";
 import type { Quiz as QuizType } from "@/lib/claude/schemas";
 import { cn } from "@/lib/utils";
+import { emitCompanionEvent } from "@/lib/companion/bus";
 
 /**
  * Presentational, interactive runner for an already-loaded quiz: pick answers,
@@ -33,6 +34,11 @@ export function QuizRunner({
     const correct = quiz.questions.filter(
       (q) => answers[q.id] === q.correctIndex,
     ).length;
+    emitCompanionEvent({
+      type: "quiz",
+      topic: progressTopic ?? quiz.topic,
+      scorePct: Math.round((correct / quiz.questions.length) * 100),
+    });
     fetch("/api/progress", {
       method: "POST",
       headers: { "Content-Type": "application/json" },

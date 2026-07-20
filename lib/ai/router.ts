@@ -17,8 +17,10 @@ import {
   getSettings,
   resolveCandidateChain,
   resolveProvider,
+  type AiSettings,
   type ResolvedProvider,
 } from "./config";
+import { normalizeCompanion } from "@/lib/companion/config";
 import { claudeProvider } from "./providers/claude";
 import { makeOpenAiCompatProvider } from "./providers/openaiCompat";
 
@@ -32,6 +34,28 @@ function tierFor(mode: ClaudeMode): ModelTier {
 function instantiate(cfg: ResolvedProvider): AiProvider {
   if (cfg.id === "claude") return claudeProvider;
   return makeOpenAiCompatProvider(cfg);
+}
+
+/**
+ * The candidate chain for a mode. Companion banter may declare a dedicated
+ * provider/model (typically a free tier) in settings — that candidate is
+ * prepended so chatter never spends the tutoring provider's budget, while the
+ * normal chain still backs it up. Every other mode uses the chain untouched.
+ */
+function candidatesFor(mode: ClaudeMode, settings: AiSettings): ResolvedProvider[] {
+  const chain = resolveCandidateChain(settings);
+  if (mode !== "companion") return chain;
+  const companion = normalizeCompanion(settings.companion);
+  if (!companion.provider || companion.provider === "claude") return chain;
+  const r = resolveProvider(companion.provider, settings);
+  if (!r.configured) return chain;
+  // The user picked this provider explicitly for the companion, so it counts
+  // even if it isn't enabled in the fallback chain. Companion runs on the
+  // light tier, so a model override lands there.
+  const preferred: ResolvedProvider = companion.model
+    ? { ...r, lightModel: companion.model }
+    : r;
+  return [preferred, ...chain.filter((c) => c.id !== preferred.id)];
 }
 
 async function* prepend(
@@ -59,7 +83,7 @@ export async function openStream(
   signal?: AbortSignal,
 ): Promise<OpenStreamResult> {
   const settings = await getSettings();
-  const candidates = resolveCandidateChain(settings);
+  const candidates = candidatesFor(mode, settings);
   if (candidates.length === 0) {
     throw new ProviderError(
       "No AI provider is configured. Open Settings to add one.",

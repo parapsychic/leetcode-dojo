@@ -43,11 +43,20 @@ export interface SyncPayload {
   firebase: { signedIn: boolean; email: string | null };
 }
 
+export interface CompanionPayload {
+  enabled: boolean;
+  chattiness: "quiet" | "normal" | "chatty";
+  characterId: string;
+  provider: string | null;
+  model: string | null;
+}
+
 export interface SettingsPayload {
   activeProvider: string;
   fallbackChain: string[];
   providers: ProviderRow[];
   sync: SyncPayload;
+  companion: CompanionPayload;
 }
 
 export interface SyncStatusPayload {

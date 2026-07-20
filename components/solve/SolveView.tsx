@@ -17,6 +17,9 @@ import type { CoachPlan } from "@/lib/claude/schemas";
 import { LANGUAGES, LANG_LABELS, type Language } from "@/components/CodeEditor";
 import { lineDiff } from "@/lib/diff";
 import { cn } from "@/lib/utils";
+import { emitCompanionEvent, noteActivity } from "@/lib/companion/bus";
+import type { PackManifest } from "@/lib/companion/pack";
+import type { CompanionSettings } from "@/lib/companion/config";
 
 const leetcodeUrl = (slug: string) => `https://leetcode.com/problems/${slug}/`;
 import type { ProblemStatus } from "@/lib/store/progress";
@@ -81,6 +84,12 @@ const DEFAULT_PLAN: Record<string, CoachPlan> = {
   Medium: { difficultyRating: "medium", budgetMinutes: 25, idleSeconds: 90, checkpointMinutes: [8, 16, 24] },
   Hard: { difficultyRating: "hard", budgetMinutes: 40, idleSeconds: 120, checkpointMinutes: [12, 24, 36] },
 };
+
+// Strip the companion's leading "[expression]" tag for in-tab display (the tag
+// only matters to the widget's sprite).
+function stripExprTag(text: string): string {
+  return text.replace(/^\s*\[[^\]\n]{1,30}\]\s*/, "");
+}
 
 // Pull the code out of a stub response (first fenced block, else the whole text).
 function extractCode(text: string): string {
@@ -161,6 +170,38 @@ export function SolveView({
   const firedCheckpointsRef = useRef<Set<number>>(new Set());
   const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  // Companion absorption: when the companion is enabled, coach nudges are
+  // delivered through her bubble in her voice (no extra LLM call — the one
+  // coach call carries a personaStyle instruction). Null = companion off.
+  const [companionVoice, setCompanionVoice] = useState<string | null>(null);
+  const attemptsRef = useRef(0);
+
+  useEffect(() => {
+    let alive = true;
+    fetch("/api/companion/pack")
+      .then((r) => r.json())
+      .then((d: { manifest?: PackManifest; settings?: CompanionSettings }) => {
+        if (!alive || !d?.settings?.enabled || !d.manifest) return;
+        const p = d.manifest.pack;
+        setCompanionVoice(
+          `${p.persona}\nSpeech style: ${p.speechStyle}\nStart your message with exactly one expression tag from [${p.expressions.join("|")}], e.g. "[thinking] ...".`,
+        );
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    emitCompanionEvent({
+      type: "problemOpen",
+      title: problem.title,
+      difficulty: problem.difficulty,
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Reward + variation
   const [reward, setReward] = useState(false);
   const [solvedMs, setSolvedMs] = useState<number | null>(null);
@@ -235,10 +276,12 @@ export function SolveView({
     if (untouched) loadStub(l);
   }
 
-  // Track edits so the coach knows how long the learner has been idle.
+  // Track edits so the coach knows how long the learner has been idle (and the
+  // companion stays quiet while the learner is actively typing).
   function handleCodeChange(v: string) {
     setCode(v);
     lastEditAtRef.current = Date.now();
+    noteActivity();
   }
 
   // Ask Claude to rate this problem and set the coach's pacing (difficulty-aware).
@@ -304,6 +347,7 @@ export function SolveView({
         coachLevel: level,
         intensity: intensity ?? "balanced",
         transcript: recent,
+        ...(companionVoice ? { personaStyle: companionVoice } : {}),
         ...(img?.hasContent
           ? { imageBase64: img.base64, imageMediaType: "image/png" as const }
           : {}),
@@ -311,19 +355,22 @@ export function SolveView({
       (full) =>
         setCoachMessages((m) => {
           const c = [...m];
-          if (c[idx]) c[idx] = { ...c[idx], text: full };
+          if (c[idx]) c[idx] = { ...c[idx], text: stripExprTag(full) };
           return c;
         }),
     );
     setCoachMessages((m) => {
       const c = [...m];
-      if (c[idx]) c[idx] = { ...c[idx], text };
+      if (c[idx]) c[idx] = { ...c[idx], text: stripExprTag(text) };
       return c;
     });
     coachLevelRef.current = level + 1;
     if (text) {
       setCoachUnread((u) => u + 1);
-      showToast(text);
+      // Companion enabled: the nudge speaks through her bubble (tag intact so
+      // the widget can pick the matching expression). Otherwise: legacy toast.
+      if (companionVoice) emitCompanionEvent({ type: "coachLine", text });
+      else showToast(text);
     }
   }
 
@@ -353,6 +400,7 @@ export function SolveView({
         intensity: intensity ?? "balanced",
         transcript: coachTranscript(withUser),
         userMessage: q,
+        ...(companionVoice ? { personaStyle: companionVoice } : {}),
         ...(img?.hasContent
           ? { imageBase64: img.base64, imageMediaType: "image/png" as const }
           : {}),
@@ -360,13 +408,13 @@ export function SolveView({
       (full) =>
         setCoachMessages((m) => {
           const c = [...m];
-          if (c[idx]) c[idx] = { ...c[idx], text: full };
+          if (c[idx]) c[idx] = { ...c[idx], text: stripExprTag(full) };
           return c;
         }),
     );
     setCoachMessages((m) => {
       const c = [...m];
-      if (c[idx]) c[idx] = { ...c[idx], text };
+      if (c[idx]) c[idx] = { ...c[idx], text: stripExprTag(text) };
       return c;
     });
   }
@@ -432,10 +480,12 @@ export function SolveView({
       return copy;
     });
     postProgress({ action: "hint", problemId: problem.id });
+    emitCompanionEvent({ type: "hint", title: problem.title, level });
   }
 
   async function getReview() {
     setVerdict(null);
+    attemptsRef.current += 1;
     postProgress({ action: "attempt", problemId: problem.id });
     if (status === "unsolved") setStatus("attempted");
     const text = await reviewStream.run("review", { ...baseCtx, code, language });
@@ -445,6 +495,14 @@ export function SolveView({
     // Only an optimal, correct solution counts as solved. A working-but-suboptimal
     // one stays "attempted" and the review nudges toward the better approach.
     if (v === "correct") markSolved();
+    else if (v) {
+      emitCompanionEvent({
+        type: "verdict",
+        verdict: v,
+        title: problem.title,
+        attempts: attemptsRef.current,
+      });
+    }
   }
 
   function markSolved() {
@@ -454,6 +512,13 @@ export function SolveView({
     timer.pause();
     postProgress({ action: "solved", problemId: problem.id, elapsedMs: ms });
     setReward(true);
+    emitCompanionEvent({
+      type: "solved",
+      problemId: problem.id,
+      title: problem.title,
+      elapsedMs: ms,
+      attempts: Math.max(attemptsRef.current, 1),
+    });
   }
 
   async function getVariation() {

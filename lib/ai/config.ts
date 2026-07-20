@@ -8,6 +8,7 @@ import path from "path";
 import { dataDir } from "@/lib/store/paths";
 import type { ProviderId } from "./types";
 import type { SyncSettings } from "@/lib/sync/config";
+import type { CompanionSettings } from "@/lib/companion/config";
 import { ALL_PROVIDER_IDS, envKeyFor, labelFor, presetFor } from "./presets";
 
 export interface StoredProviderOverride {
@@ -26,6 +27,8 @@ export interface AiSettings {
   providers: Partial<Record<ProviderId, StoredProviderOverride>>;
   /** Progress-sync configuration (see lib/sync/config.ts). Optional for old files. */
   sync?: Partial<SyncSettings>;
+  /** Companion-character configuration (see lib/companion/config.ts). Optional for old files. */
+  companion?: Partial<CompanionSettings>;
 }
 
 // Fully-resolved config the router/providers actually use.

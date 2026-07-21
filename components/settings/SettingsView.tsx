@@ -5,7 +5,7 @@
 // AI-provider and sync settings together through POST /api/settings.
 
 import { useEffect, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { AlertTriangle, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui";
 import { matchQuery, type SectionId } from "./searchIndex";
 import { SettingsNav, SettingsSearch, SettingsSection } from "./primitives";
@@ -58,6 +58,8 @@ export function SettingsView() {
   const [tests, setTests] = useState<Record<string, TestState>>({});
   const [modelLists, setModelLists] = useState<Record<string, ModelListState>>({});
 
+  const [isAppImage, setIsAppImage] = useState(false);
+
   // ---- Sync state ----
   const [syncData, setSyncData] = useState<SettingsPayload["sync"] | null>(null);
   const [syncForm, setSyncForm] = useState<SyncFormState | null>(null);
@@ -79,6 +81,7 @@ export function SettingsView() {
     setRows(orderRows(d));
     setActiveProvider(d.activeProvider);
     setSyncData(d.sync);
+    setIsAppImage(Boolean(d.isAppImage));
   }
 
   async function refetchSettings(): Promise<SettingsPayload> {
@@ -361,6 +364,27 @@ export function SettingsView() {
             match={match}
             active={section}
           >
+            {isAppImage && (
+              <div className="mb-4 flex items-start gap-2 rounded-xl border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-300">
+                <AlertTriangle size={16} className="mt-0.5 shrink-0" />
+                <span>
+                  You&apos;re running the <strong>AppImage</strong> build.
+                  AppImages bundle their own runtime and can&apos;t use the
+                  Claude Code installed on your system, so the default Claude
+                  provider won&apos;t work here. To use Claude, install the
+                  .deb, .rpm, or Arch (.pacman) package from the{" "}
+                  <a
+                    href="https://github.com/parapsychic/leetcode-dojo/releases"
+                    target="_blank"
+                    rel="noreferrer"
+                    className="underline underline-offset-2"
+                  >
+                    releases page
+                  </a>{" "}
+                  — or configure an API-key provider below as your primary.
+                </span>
+              </div>
+            )}
             <ProvidersSection
               rows={rows}
               activeProvider={activeProvider}

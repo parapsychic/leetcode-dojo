@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { memo, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
@@ -893,7 +893,10 @@ function CoachControl({
   );
 }
 
-function StatementPanel({
+// memo'd: the timer re-renders SolveView 4x/second, and re-rendering the
+// statement re-runs `dangerouslySetInnerHTML` (React 19 sets innerHTML whenever
+// the prop *object* changes identity), which wipes scroll position and selection.
+const StatementPanel = memo(function StatementPanel({
   html,
   text,
   live,
@@ -908,6 +911,9 @@ function StatementPanel({
   curated: string | null;
   slug: string | null;
 }) {
+  // Stable identity so React never re-sets innerHTML for unchanged markup.
+  const markup = useMemo(() => (html ? { __html: html } : null), [html]);
+
   if (isGfg) {
     if (curated) {
       return (
@@ -933,7 +939,7 @@ function StatementPanel({
       </div>
     );
   }
-  if (html) {
+  if (markup) {
     return (
       <>
         {live === false && (
@@ -941,7 +947,7 @@ function StatementPanel({
             Showing a cached/offline view — the LeetCode API was unreachable.
           </p>
         )}
-        <div className="lc-statement" dangerouslySetInnerHTML={{ __html: html }} />
+        <div className="lc-statement" dangerouslySetInnerHTML={markup} />
       </>
     );
   }
@@ -963,4 +969,4 @@ function StatementPanel({
       {text && <div className="mt-3 whitespace-pre-wrap">{text}</div>}
     </div>
   );
-}
+});

@@ -11,7 +11,8 @@ import { readFileSync } from "node:fs";
 // Commits git (or the release bot) writes itself pass through untouched.
 const generated = /^(Merge |Revert |fixup!|squash!|chore\(release\):)/;
 
-const conventional = /^(feat|fix)(\([a-z0-9._-]+\))?!?: .+/;
+// Scopes allow mixed case so component names read naturally: fix(SolveView): ...
+const conventional = /^(feat|fix)(\([A-Za-z0-9._-]+\))?!?: .+/;
 
 const ok = (subject) =>
   generated.test(subject) || conventional.test(subject);

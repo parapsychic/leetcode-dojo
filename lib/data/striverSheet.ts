@@ -89,6 +89,7 @@ export const STRIVER_SHEET: SheetSection[] = [
       p("4Sum", "Medium", "4sum"),
       p("Longest Consecutive Sequence", "Medium", "longest-consecutive-sequence"),
       p("Largest Subarray with 0 Sum", "Medium", null),
+      p("Longest Subarray with Sum K", "Medium", null),
       p("Count Subarrays with Given XOR", "Hard", null),
       p("Longest Substring Without Repeating Characters", "Medium", "longest-substring-without-repeating-characters"),
     ],

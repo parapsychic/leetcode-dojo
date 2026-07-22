@@ -16,6 +16,7 @@ import type { CoachIntensity } from "@/lib/claude/prompts";
 import type { CoachPlan } from "@/lib/claude/schemas";
 import { LANGUAGES, LANG_LABELS, type Language } from "@/components/CodeEditor";
 import { lineDiff } from "@/lib/diff";
+import { practiceLinkLabel } from "@/lib/data/gfgLinks";
 import { cn } from "@/lib/utils";
 
 const leetcodeUrl = (slug: string) => `https://leetcode.com/problems/${slug}/`;
@@ -35,6 +36,8 @@ interface ProblemMeta {
   source: "leetcode" | "gfg";
   /** Curated Markdown statement for GFG-only problems; null for LeetCode ones. */
   statement: string | null;
+  /** GeeksforGeeks practice link for GFG-only problems; null for LeetCode ones. */
+  gfgUrl: string | null;
 }
 
 const STARTER: Record<Language, string> = {
@@ -537,7 +540,7 @@ export function SolveView({
             onToggle={timer.toggle}
             onReset={timer.reset}
           />
-          {problem.leetcodeSlug && (
+          {problem.leetcodeSlug ? (
             <a
               href={leetcodeUrl(problem.leetcodeSlug)}
               target="_blank"
@@ -546,7 +549,16 @@ export function SolveView({
             >
               LeetCode <ExternalLink size={12} />
             </a>
-          )}
+          ) : problem.gfgUrl ? (
+            <a
+              href={problem.gfgUrl}
+              target="_blank"
+              rel="noreferrer"
+              className="flex items-center gap-1 text-xs text-muted hover:text-foreground"
+            >
+              {practiceLinkLabel(problem.gfgUrl)} <ExternalLink size={12} />
+            </a>
+          ) : null}
         </div>
       </div>
 
@@ -585,6 +597,7 @@ export function SolveView({
                 isGfg={problem.source === "gfg"}
                 curated={problem.statement}
                 slug={problem.leetcodeSlug}
+                gfgUrl={problem.gfgUrl}
               />
             )}
 
@@ -903,6 +916,7 @@ const StatementPanel = memo(function StatementPanel({
   isGfg,
   curated,
   slug,
+  gfgUrl,
 }: {
   html: string | null;
   text: string;
@@ -910,6 +924,7 @@ const StatementPanel = memo(function StatementPanel({
   isGfg: boolean;
   curated: string | null;
   slug: string | null;
+  gfgUrl: string | null;
 }) {
   // Stable identity so React never re-sets innerHTML for unchanged markup.
   const markup = useMemo(() => (html ? { __html: html } : null), [html]);
@@ -919,15 +934,38 @@ const StatementPanel = memo(function StatementPanel({
       return (
         <div className="lc-statement">
           <Markdown>{curated}</Markdown>
+          {gfgUrl && (
+            <p className="mt-4 text-sm not-prose">
+              <a
+                className="text-accent underline"
+                href={gfgUrl}
+                target="_blank"
+                rel="noreferrer"
+              >
+                Open it on {practiceLinkLabel(gfgUrl) === "TUF" ? "takeUforward" : "GeeksforGeeks"}
+              </a>
+            </p>
+          )}
         </div>
       );
     }
     return (
       <div className="text-sm text-muted">
         <p>
-          This is a GeeksforGeeks-style problem from the sheet. Read the full
-          statement on GfG, then solve it here with hints, review, and the
-          interviewer.
+          This is a GeeksforGeeks-style problem from the sheet.{" "}
+          {gfgUrl ? (
+            <a
+              className="text-accent underline"
+              href={gfgUrl}
+              target="_blank"
+              rel="noreferrer"
+            >
+              Read the full statement on {practiceLinkLabel(gfgUrl) === "TUF" ? "takeUforward" : "GfG"}
+            </a>
+          ) : (
+            "Read the full statement on GfG"
+          )}
+          , then solve it here with hints, review, and the interviewer.
         </p>
       </div>
     );

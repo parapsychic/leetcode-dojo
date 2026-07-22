@@ -60,6 +60,27 @@ Explanation: No subarray sums to 0.
 - \`-1000 <= arr[i] <= 1000\`
 - Expected time: \`O(n)\` using a prefix-sum hash map.`,
 
+  "Longest Subarray with Sum K": `Given an array \`arr\` and an integer \`k\`, find the length of the **longest contiguous subarray whose elements sum to exactly \`k\`**.
+
+**Example 1**
+\`\`\`
+Input:  arr = [10, 5, 2, 7, 1, 9], k = 15
+Output: 4
+Explanation: The subarray [5, 2, 7, 1] sums to 15.
+\`\`\`
+
+**Example 2**
+\`\`\`
+Input:  arr = [-1, 2, 3], k = 6
+Output: 0
+Explanation: No subarray sums to 6.
+\`\`\`
+
+**Constraints**
+- \`1 <= arr.length <= 1e5\`
+- \`-1000 <= arr[i] <= 1000\` (array may contain negatives, so sliding window alone is not enough)
+- Expected time: \`O(n)\` using a prefix-sum hash map.`,
+
   "Count Subarrays with Given XOR": `Given an array of integers \`arr\` and an integer \`k\`, count the number of **contiguous subarrays** whose elements XOR to exactly \`k\`.
 
 **Example 1**

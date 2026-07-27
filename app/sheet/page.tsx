@@ -1,5 +1,6 @@
 import Link from "next/link";
 import { STRIVER_SHEET } from "@/lib/data/striverSheet";
+import { getGfgUrl, practiceLinkLabel } from "@/lib/data/gfgLinks";
 import { getProgress } from "@/lib/store/progress";
 import { Card, DifficultyBadge } from "@/components/ui";
 import { CheckCircle2, Circle, CircleDot, ExternalLink } from "lucide-react";
@@ -53,7 +54,11 @@ export default async function SheetPage() {
                         <span className="flex-1">{p.title}</span>
                         {p.source === "gfg" && (
                           <span className="flex items-center gap-1 text-[11px] text-muted">
-                            GFG <ExternalLink size={11} />
+                            {(() => {
+                              const url = getGfgUrl(p.id, p.title);
+                              return url ? practiceLinkLabel(url) : "GFG";
+                            })()}{" "}
+                            <ExternalLink size={11} />
                           </span>
                         )}
                         <DifficultyBadge difficulty={p.difficulty} />

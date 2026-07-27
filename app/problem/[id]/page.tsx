@@ -1,6 +1,7 @@
 import { notFound } from "next/navigation";
 import { getProblemById, ALL_PROBLEMS } from "@/lib/data/striverSheet";
 import { getGfgStatement } from "@/lib/data/gfgStatements";
+import { getGfgUrl } from "@/lib/data/gfgLinks";
 import { getProgress } from "@/lib/store/progress";
 import { SolveView } from "@/components/solve/SolveView";
 
@@ -30,6 +31,7 @@ export default async function ProblemPage({
         leetcodeSlug: problem.leetcodeSlug,
         source: problem.source,
         statement: problem.leetcodeSlug ? null : getGfgStatement(problem.id),
+        gfgUrl: problem.leetcodeSlug ? null : getGfgUrl(problem.id, problem.title),
       }}
       nextId={next?.id ?? null}
       initialStatus={status}

@@ -91,6 +91,19 @@ body {
   color: var(--accent);
   text-decoration: underline;
 }
+/* KaTeX display math: scroll on overflow instead of breaking layout. */
+.prose-chat .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.2rem 0;
+  margin: 0.6rem 0;
+}
+/* KaTeX renders inside <code> spans in some inputs; don't box math as code. */
+.prose-chat .katex code {
+  background: transparent;
+  border: none;
+  padding: 0;
+}
 
 /* LeetCode statement HTML */
 .lc-statement {

@@ -26,6 +26,13 @@ export interface ChatRequest {
   tier: ModelTier;
   image?: ChatImage;
   signal?: AbortSignal;
+  /**
+   * Ask the provider to ground the answer with live web search where it can:
+   * claude enables the Agent SDK's WebSearch tool; openrouter appends the
+   * ":online" model suffix. Providers without a search capability ignore this —
+   * the caller is expected to supply fetched source material instead.
+   */
+  webSearch?: boolean;
 }
 
 export interface HealthResult {

@@ -20,15 +20,17 @@ import { CLAUDE_LABEL } from "../presets";
 const MODEL_HEAVY = "claude-opus-4-8";
 const MODEL_LIGHT = "claude-opus-4-8";
 
-function baseOptions(system: string, model: string): Options {
+function baseOptions(system: string, model: string, webSearch?: boolean): Options {
   return {
     model,
     systemPrompt: system, // plain string => focused tutor, NOT the claude_code preset
-    tools: [], // no filesystem/bash — text-only reasoning
+    // No filesystem/bash — text-only reasoning. webSearch (character generation)
+    // opens exactly one tool, and needs extra turns for search-then-answer.
+    tools: webSearch ? ["WebSearch"] : [],
     settingSources: [], // ignore user/project .claude settings for isolation
     permissionMode: "bypassPermissions",
     includePartialMessages: true,
-    maxTurns: 1,
+    maxTurns: webSearch ? 6 : 1,
   };
 }
 
@@ -124,7 +126,7 @@ async function* streamChat(req: ChatRequest): AsyncGenerator<string> {
       : req.prompt;
     const q = query({
       prompt: promptInput,
-      options: { ...baseOptions(req.system, model), abortController },
+      options: { ...baseOptions(req.system, model, req.webSearch), abortController },
     });
 
     for await (const msg of q) {

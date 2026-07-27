@@ -107,37 +107,56 @@ function SpriteStack({
   blinking: boolean;
   mouthOpen: boolean;
 }) {
-  const v = sprites[active];
-  // Overlay priority: blink wins over mouth (it lasts 130ms; flapping resumes after).
-  const overlay =
-    blinking && v.eyesClosed ? v.eyesClosed : mouthOpen && v.mouthOpen ? v.mouthOpen : null;
-
+  // Every image — bases AND variants — stays permanently mounted, so nothing
+  // ever needs a decode pass mid-animation (a freshly-mounted <img> paints
+  // blank for a frame or two, which read as a black flicker on each blink).
+  // Bases crossfade (180ms) between expressions; variant overlays swap with
+  // NO transition — a blink is an instant swap, not a fade — and simply draw
+  // on top of the base (same canvas, so they cover the eyes/mouth region).
+  // Priority: blink wins over mouth (it lasts 130ms; flapping resumes after).
+  const img = "absolute inset-0 h-full w-full object-contain object-bottom";
   return (
     <div className="relative h-44 w-40 select-none">
-      {/* All expression bases stay mounted (pre-loaded) and crossfade via opacity. */}
-      {Object.entries(sprites).map(([expr, sv]) =>
-        sv.base ? (
-          <motion.img
-            key={expr}
-            src={sv.base}
-            alt=""
-            draggable={false}
-            initial={false}
-            animate={{ opacity: expr === active && !overlay ? 1 : 0 }}
-            transition={{ duration: 0.18 }}
-            className="absolute inset-0 h-full w-full object-contain object-bottom"
-          />
-        ) : null,
-      )}
-      {overlay && (
-        // eslint-disable-next-line @next/next/no-img-element -- local pack sprite; next/image adds nothing for tiny local PNGs
-        <img
-          src={overlay}
-          alt=""
-          draggable={false}
-          className="absolute inset-0 h-full w-full object-contain object-bottom"
-        />
-      )}
+      {Object.entries(sprites).map(([expr, sv]) => {
+        const isActive = expr === active;
+        const showEyes = isActive && blinking && Boolean(sv.eyesClosed);
+        const showMouth = isActive && !showEyes && mouthOpen && Boolean(sv.mouthOpen);
+        return (
+          <div key={expr}>
+            {sv.base && (
+              <motion.img
+                src={sv.base}
+                alt=""
+                draggable={false}
+                initial={false}
+                animate={{ opacity: isActive ? 1 : 0 }}
+                transition={{ duration: 0.18 }}
+                className={img}
+              />
+            )}
+            {sv.eyesClosed && (
+              // eslint-disable-next-line @next/next/no-img-element -- local pack sprite
+              <img
+                src={sv.eyesClosed}
+                alt=""
+                draggable={false}
+                className={img}
+                style={{ opacity: showEyes ? 1 : 0 }}
+              />
+            )}
+            {sv.mouthOpen && (
+              // eslint-disable-next-line @next/next/no-img-element -- local pack sprite
+              <img
+                src={sv.mouthOpen}
+                alt=""
+                draggable={false}
+                className={img}
+                style={{ opacity: showMouth ? 1 : 0 }}
+              />
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }

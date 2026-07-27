@@ -1,6 +1,8 @@
 // System + user prompt construction per interaction mode.
 // The pedagogy ("subtle hints, never the full answer") lives here.
 
+import { APP_GUIDE } from "./appGuide";
+
 export type ClaudeMode =
   | "hint"
   | "review"
@@ -14,7 +16,8 @@ export type ClaudeMode =
   | "stub"
   | "coach"
   | "coachPlan"
-  | "companion";
+  | "companion"
+  | "characterGen";
 
 export type CoachIntensity = "gentle" | "balanced" | "assertive";
 
@@ -52,6 +55,12 @@ export interface PromptContext {
   userName?: string;
   // Coach mode: when set, the coach speaks as this character (companion absorption).
   personaStyle?: string;
+  // characterGen mode: inputs for generating a character pack's character.json.
+  characterName?: string;
+  sourceTitle?: string; // the show/game/book the character is from
+  notes?: string;
+  sourceMaterial?: string; // pasted and/or wiki-fetched text, capped by the caller
+  ocDescription?: string; // original-character path: the user's own description
 }
 
 const NEVER_SOLVE = `Absolute rule: NEVER write the full or near-full solution, and never write the core algorithm in code. You may reference tiny, generic snippets (a loop skeleton, a data-structure declaration) but never the lines that constitute the actual answer. If asked directly for the solution, refuse warmly and give the next nudge instead. Your job is to make the learner arrive at it themselves.`;
@@ -266,7 +275,11 @@ Speech style: ${ctx.speechStyle || "1-3 short sentences, conversational, no mark
 You are the COMPANION widget in a coding-practice app — the mascot, NOT the tutor. Hard rules:
 - You do not know the problems' contents or solutions, and you NEVER discuss approaches, algorithms, data structures, complexity, or code. If asked for any of that, refuse in character (tease them) and point them to the Hints tab or the Coach instead.
 - Keep it to 1-3 short sentences. No markdown, no emoji, no roleplay actions in asterisks.
-- Output contract: your reply MUST start with exactly one expression tag from [${expressions.join("|")}] followed by the spoken line. Example: "[smug] Hmph. Obviously."`;
+- Output contract: your reply MUST start with exactly one expression tag from [${expressions.join("|")}] followed by the spoken line. Example: "[smug] Hmph. Obviously."${
+        ctx.userMessage
+          ? `\n\nYou DO know the app itself well. If they ask how the app works or where something is, answer accurately (in character, still 1-3 sentences) from this guide:\n${APP_GUIDE}`
+          : ""
+      }`;
       const prompt = `The learner's name: ${ctx.userName || "(unknown — don't invent one)"}.
 ${ctx.eventSummary ? `What just happened in the app: ${ctx.eventSummary}\n` : ""}${
         transcriptBlock(ctx) ? `Recent banter:\n${transcriptBlock(ctx)}\n\n` : ""
@@ -275,6 +288,31 @@ ${ctx.eventSummary ? `What just happened in the app: ${ctx.eventSummary}\n` : ""
           ? `They just said to you: ${ctx.userMessage}\n\nReply in character.`
           : "React in character with one line."
       }`;
+      return { system, prompt };
+    }
+
+    case "characterGen": {
+      const system = `You write character definition files for a coding-practice app's companion widget: a small character who lives at the bottom of the screen, greets the learner, reacts to solves/failed attempts/streaks/quizzes, and banters — she is a mascot, NOT a tutor, and pack lines must never give study help.
+
+Output ONLY valid JSON (no prose, no markdown fences) matching exactly:
+{"name": string, "persona": string, "speechStyle": string, "defaultExpression": "neutral", "expressions": ["neutral","smug","annoyed","flustered","proud","thinking"], "eventLines": {<key>: [{"expression": string, "text": string}, ...], ...}, "voice": {"enabled": false, "dir": "voice", "format": "wav"}}
+
+Rules:
+- persona: 3-6 sentences, second person ("You are..."), capturing the character's canonical personality, mannerisms, running gags, relationships, and speech quirks — the distinguishing features that make fans go "that's really them". When source material is provided below, prefer it over your own recollection and NEVER contradict it; do not invent facts about a real franchise character.
+- speechStyle: 1-2 sentences of delivery constraints (length, register, verbal tics). Lines are SPOKEN text: no markdown, no emoji, no roleplay asterisks.
+- eventLines: provide ALL of these keys, 3-5 lines each, every line in-voice: "greeting", "greetingStreak", "greetingMorning", "greetingNight", "problemOpen", "solved", "streak", "suboptimal", "incorrect", "incomplete", "hintUsed", "quizGood", "quizBad", "idleReturn".
+- Template slots available (use where natural): {name} = learner's name, {title} = problem title, {score} = quiz percent, {streak} = streak days. greetingStreak lines should use {streak}.
+- Each line's "expression" must be one of the six expressions. Vary them to fit the emotion of the line.`;
+      const material = (ctx.sourceMaterial || "").slice(0, 8000);
+      const prompt = ctx.ocDescription
+        ? `Create the character JSON for an ORIGINAL character designed by the user.${ctx.characterName ? `\nName: ${ctx.characterName}` : ""}
+Their description of the character:
+${ctx.ocDescription.slice(0, 4000)}
+
+Flesh them out faithfully (fill gaps in the same spirit rather than contradicting anything stated). Output the JSON now.`
+        : `Create the character JSON for: ${ctx.characterName || "(unnamed)"} from ${ctx.sourceTitle || "(unknown source)"}.
+${ctx.notes ? `User notes: ${ctx.notes.slice(0, 1000)}\n` : ""}${material ? `Source material (authoritative — prefer over memory):\n${material}\n` : "Use your knowledge of this character; if web search is available to you, verify their canonical mannerisms and speech quirks first."}
+Output the JSON now.`;
       return { system, prompt };
     }
 

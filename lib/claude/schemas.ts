@@ -1,4 +1,11 @@
 import { z } from "zod";
+import { CharacterPackSchema } from "@/lib/companion/pack";
+
+// ---- Character generation (companion wizard) ----
+// The model authors everything user-visible; the server supplies version and a
+// slugified id before install.
+export const GeneratedPackSchema = CharacterPackSchema.omit({ id: true, version: true });
+export type GeneratedPack = z.infer<typeof GeneratedPackSchema>;
 
 // ---- Visualization protocol ----
 // Claude emits a VizSpec: a sequence of frames the frontend renderers animate.

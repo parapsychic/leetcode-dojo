@@ -57,6 +57,17 @@ export function makeOpenAiCompatProvider(cfg: ResolvedProvider): AiProvider {
     return tier === "heavy" ? cfg.heavyModel : cfg.lightModel;
   }
 
+  // OpenRouter's web-search plugin is opted into via a ":online" model suffix —
+  // the only OpenAI-compatible provider here with a search switch. Others
+  // ignore webSearch (the caller supplies fetched source material instead).
+  function modelForRequest(req: ChatRequest): string {
+    const model = modelFor(req.tier);
+    if (req.webSearch && cfg.id === "openrouter" && !model.endsWith(":online")) {
+      return `${model}:online`;
+    }
+    return model;
+  }
+
   async function* streamChat(req: ChatRequest): AsyncGenerator<string> {
     // Only send the image to a model that can actually see it.
     const chatReq: ChatRequest =
@@ -69,7 +80,7 @@ export function makeOpenAiCompatProvider(cfg: ResolvedProvider): AiProvider {
         headers: headers(),
         signal: req.signal,
         body: JSON.stringify({
-          model: modelFor(req.tier),
+          model: modelForRequest(req),
           stream: true,
           messages: [
             { role: "system", content: req.system },

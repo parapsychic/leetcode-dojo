@@ -68,6 +68,21 @@ export const SETTINGS_INDEX: IndexRow[] = [
   },
   {
     sectionId: "companion",
+    rowId: "companion:character",
+    label: "Character",
+    keywords: ["companion", "character", "switch", "pack", "kurisu", "pick", "select"],
+  },
+  {
+    sectionId: "companion",
+    rowId: "companion:install",
+    label: "Characters",
+    keywords: [
+      "companion", "install", "import", "zip", "add", "delete", "remove", "folder", "pack",
+      "create", "generate", "wizard", "custom", "oc", "original", "edit", "sprites", "ai",
+    ],
+  },
+  {
+    sectionId: "companion",
     rowId: "companion:chattiness",
     label: "Chattiness",
     keywords: ["companion", "chattiness", "quiet", "chatty", "frequency", "talk", "banter"],

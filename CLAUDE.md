@@ -89,19 +89,40 @@ A character (Makise Kurisu by default) is docked on every page: she greets you,
 reacts to solves/verdicts/streaks, nudges when you stall, and replies when you
 type back. She is **the mascot, not the tutor** — see the invariants below.
 
-**Characters are data.** A *pack* is `public/characters/<id>/`: `character.json`
-(persona, speech style, `expressions[]`, `eventLines` — 3-5 canned templated lines
-per event, `{name}`/`{title}`/`{score}` slots), `sprites/`, `voice/`. The app only
-ever *reads* packs; nothing about Kurisu is hardcoded. That boundary exists so a
-separate project can automate pack creation (auto-rig an arbitrary character image,
-draft a persona, clone a voice) without touching this code — the hand-assembled
-Kurisu pack is the reference output. Art and audio are gitignored; `character.json`
-is not.
+**Characters are data.** A *pack* is a folder holding `character.json` (persona,
+speech style, `expressions[]`, `eventLines` — 3-5 canned templated lines per event,
+`{name}`/`{title}`/`{score}`/`{streak}`/`{solved}` slots; optional
+`greetingStreak`/`greetingMorning`/`greetingNight` keys), `sprites/` (expression
+PNGs + optional `chibi.png` for the minimized dock), `voice/`. Packs live in **two
+roots**: bundled `public/characters/<id>/` (static-served) and user-installed
+`dataDir()/characters/<id>/` (served via `GET /api/companion/asset/<id>/...`;
+**installed shadows bundled** on id collision). Users add packs by zip upload in
+Settings (`POST /api/companion/import` — validates against the zod schema, guards
+zip-slip, stages-then-renames) or by copying a folder in; the import endpoint is
+the future character engine's delivery target. The app only ever *reads* packs;
+nothing about Kurisu is hardcoded. Art and audio are gitignored; `character.json`
+is not. All pack storage access stays behind `pack.ts` + the asset/import routes,
+so a future multi-tenant backend swaps the storage driver there only.
 
-- **`pack.ts`** — zod schema + `loadCharacterPack(id)`. Reads from `process.cwd()/public`
-  (correct in dev *and* the packaged Electron standalone build) and **fs-probes every
-  sprite variant**, so the client never 404-spams for art that isn't there. Served by
-  `GET /api/companion/pack` — the one seam to change if packs later move to `dataDir()`.
+- **`pack.ts`** — zod schema, `loadCharacterPack(id)`, `listCharacterPacks()`
+  (roster for the Settings picker, invalid packs flagged not fatal). **fs-probes
+  every sprite variant**, so the client never 404-spams for art that isn't there.
+  Manifest served by `GET /api/companion/pack`; roster + install-dir path by
+  `GET /api/companion/characters`, whose POST also handles pack CRUD
+  (`validate`/`create`/`update` — writing over a bundled id is the intended
+  "customize the built-in character" fork — and `delete`, resetting the active id
+  if needed). `POST /api/companion/sprites` uploads PNGs into an installed pack.
+- **Character wizard** (`components/settings/CharacterWizard.tsx`) — Settings →
+  Companion → "Add character": import-zip (with structure guide), or AI-generate a
+  pack via the `characterGen` prompt mode — famous characters (model knowledge +
+  web search) or original characters (user description) — then a form/raw-JSON
+  editor with a preview-line button, saved through the CRUD actions above.
+  Search tiers for generation: the router prefers **claude** for `characterGen`
+  (native Agent SDK WebSearch via `ChatRequest.webSearch`); openrouter grounds
+  itself with a `:online` model suffix; for all other providers
+  `lib/companion/sourceFetch.ts` fetches Wikipedia/Fandom extracts (MediaWiki
+  APIs, no keys, disk-cached 24h, best-effort → "") into the prompt. Pasted user
+  material always wins.
 - **`bus.ts`** — a module-level typed pub/sub (`emitCompanionEvent`/`subscribeCompanion`)
   with a 10-event/5s replay buffer, plus `noteActivity()` for quiet-while-typing. It
   exists because the app has **no global client state** and the root layout is a server
@@ -158,18 +179,29 @@ in dev, Electron `userData` when packaged, OS tmp otherwise.
 - The `ask` mode is used as a lightweight health probe.
 - When adding a provider: add a preset, add its id to the `ProviderId` union, and it
   flows through `openaiCompat` automatically — no router changes needed.
-- The companion greets **once per browser session** (`sessionStorage`), so a refresh
-  won't re-greet — which means the conversation can legitimately be empty. Panel
-  open/closed state is derived from "did something arrive after the last collapse"
-  **or** an explicit open; drop the second half and clicking her does nothing when
-  the history is empty.
+- The companion greets **once per browser session per character**
+  (`companion:greeted:<id>`), so a refresh won't re-greet — which means the
+  conversation can legitimately be empty. Panel open/closed state is derived from
+  "did something arrive after the last collapse" **or** an explicit open; drop the
+  second half and clicking her does nothing when the history is empty.
+- Companion chat history is keyed per character (`companion:history:<id>`), and
+  isolation is **structural**: `CompanionWidget` keys the inner dock on the pack id,
+  so switching characters remounts the brain and history hydrates synchronously.
+  Don't "optimize" the key away — that's what prevents one character inheriting
+  another's conversation (and feeding it to the model as her own).
 - Companion message ids must resume past restored history (`lineIdRef` seeds from the
   max restored id) — reusing an id makes a new line overwrite an old one, since
   messages are patched by id.
-- Known gaps: no UI to pick a character (`companion.characterId` works, but nothing
-  lists installed packs), and chat history uses one global `sessionStorage` key rather
-  than a per-character one, so switching characters would inherit the previous one's
-  conversation.
+- The app-guide digest (`lib/claude/appGuide.ts`) is appended to the companion
+  prompt **only when a `userMessage` is present** — keep proactive banter off that
+  token bill, and keep the guide free of problem/solution content.
+- `characterGen` is heavy-tier, uncached, and claude-first regardless of the
+  active provider. `sourceFetch` failures must stay silent (generation proceeds
+  on model knowledge); never make the wizard depend on the fetch succeeding.
+- Sprite images must never mount/unmount during animation: `CompanionSprite`
+  keeps every base AND variant permanently mounted and toggles opacity (blinks
+  are instant, expression changes crossfade). A freshly-mounted `<img>` paints
+  blank for a frame — that was the "black flicker on every blink" bug.
 - Verifying UI work: there is no test suite and no browser driver installed. Drive the
   running dev server with Chrome over the DevTools Protocol (headless Chrome +
   `--remote-debugging-port`, Node 22's native `WebSocket`) — that is how the two

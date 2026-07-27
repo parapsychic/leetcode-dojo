@@ -29,8 +29,12 @@ const TYPING_RETRY_MS = 8000;
 const HISTORY_MAX = 40;
 /** How many recent turns the model is given as context. */
 const LLM_CONTEXT_TURNS = 10;
-const HISTORY_KEY = "companion:history";
 const TAG_SCAN_LIMIT = 40;
+
+// History is keyed per character so switching packs can't leak one character's
+// conversation into another's context (she'd treat the previous character's
+// lines as her own).
+const historyKey = (characterId: string) => `companion:history:${characterId}`;
 
 export interface CompanionMessage {
   id: number;
@@ -44,13 +48,17 @@ export interface CompanionMessage {
 
 interface BrainInput {
   manifest: PackManifest | null;
+  /** The active pack's id — history/greeting state is keyed on it. */
+  characterId: string | null;
   chattiness: Chattiness;
   userName: string | null;
+  /** Extra template slots for canned lines (e.g. {streak}, {solved}). */
+  templateVars: Record<string, string | number>;
 }
 
-function loadHistory(): CompanionMessage[] {
+function loadHistory(characterId: string): CompanionMessage[] {
   try {
-    const raw = sessionStorage.getItem(HISTORY_KEY);
+    const raw = sessionStorage.getItem(historyKey(characterId));
     const parsed = raw ? (JSON.parse(raw) as CompanionMessage[]) : [];
     if (!Array.isArray(parsed)) return [];
     // Anything mid-reveal when the page unloaded is shown as finished.
@@ -61,10 +69,14 @@ function loadHistory(): CompanionMessage[] {
 }
 
 export function useCompanionBrain(input: BrainInput) {
-  // Restored lazily: sessionStorage is unavailable during SSR, and loadHistory
-  // swallows that — the widget renders nothing until its pack fetch lands, so
-  // server and client markup agree either way.
-  const [messages, setMessages] = useState<CompanionMessage[]>(loadHistory);
+  // The caller remounts this hook's component (React `key`) when the character
+  // changes, so characterId is fixed for this instance's lifetime and history
+  // can restore synchronously. Lazy: sessionStorage is unavailable during SSR,
+  // and loadHistory swallows that — the widget renders nothing until its pack
+  // fetch lands, so server and client markup agree either way.
+  const [messages, setMessages] = useState<CompanionMessage[]>(() =>
+    input.characterId ? loadHistory(input.characterId) : [],
+  );
   const [mouthOpen, setMouthOpen] = useState(false);
   const [thinking, setThinking] = useState(false);
 
@@ -80,6 +92,8 @@ export function useCompanionBrain(input: BrainInput) {
   const pendingRef = useRef<(() => void) | null>(null);
   const retryTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const messagesRef = useRef<CompanionMessage[]>(messages);
+  // Fixed for this instance (see remount note above); commit persists under it.
+  const characterIdRef = useRef(input.characterId);
   // Resume past any restored history — reusing an id would make a new line
   // overwrite an old one (they're patched by id) and duplicate React keys.
   const lineIdRef = useRef(messages.reduce((max, m) => Math.max(max, m.id), 0));
@@ -92,8 +106,10 @@ export function useCompanionBrain(input: BrainInput) {
       const value = next(messagesRef.current).slice(-HISTORY_MAX);
       messagesRef.current = value;
       setMessages(value);
+      const id = characterIdRef.current;
+      if (!id) return; // no character yet — keep in memory only
       try {
-        sessionStorage.setItem(HISTORY_KEY, JSON.stringify(value));
+        sessionStorage.setItem(historyKey(id), JSON.stringify(value));
       } catch {
         // storage full/blocked — the in-memory copy still works
       }
@@ -188,7 +204,11 @@ export function useCompanionBrain(input: BrainInput) {
       if (!manifest) return false;
       const canned = pickCanned(manifest.pack, eventKey, directorRef.current);
       if (!canned) return false;
-      const allVars = { name: inputRef.current.userName ?? "", ...vars };
+      const allVars = {
+        name: inputRef.current.userName ?? "",
+        ...inputRef.current.templateVars,
+        ...vars,
+      };
       speakText(fillTemplate(canned.text, allVars), canned.expression);
       return true;
     },
@@ -316,9 +336,28 @@ export function useCompanionBrain(input: BrainInput) {
     [speakCanned, speakLlm, speakProactively, speakText],
   );
 
-  /** Session greeting (widget gates it to once per browser session). */
+  /**
+   * Session greeting (widget gates it to once per session per character).
+   * Cascade: streak brag (when there's one to brag about) → time-of-day
+   * flavor → plain greeting. speakCanned returns false for keys the pack
+   * doesn't define, so packs without the optional keys behave as before.
+   */
   const greet = useCallback(() => {
-    speakProactively(() => speakCanned("greeting", {}));
+    speakProactively(() => {
+      const streak = Number(inputRef.current.templateVars.streak ?? 0);
+      const hour = new Date().getHours();
+      const keys: string[] = [];
+      if (streak >= 2) keys.push("greetingStreak");
+      if (hour >= 23 || hour < 5) keys.push("greetingNight");
+      else if (hour < 12) keys.push("greetingMorning");
+      keys.push("greeting");
+      for (const key of keys) if (speakCanned(key, {})) return;
+    });
+  }, [speakCanned, speakProactively]);
+
+  /** "You're back" line after a long absence (widget owns the visibility timer). */
+  const idleReturn = useCallback(() => {
+    speakProactively(() => speakCanned("idleReturn", {}));
   }, [speakCanned, speakProactively]);
 
   /** User typed a reply — always answered, interrupts anything playing. */
@@ -356,6 +395,7 @@ export function useCompanionBrain(input: BrainInput) {
     thinking,
     handleEvent,
     greet,
+    idleReturn,
     sendReply,
     clearHistory,
   };

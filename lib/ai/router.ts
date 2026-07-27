@@ -25,7 +25,7 @@ import { claudeProvider } from "./providers/claude";
 import { makeOpenAiCompatProvider } from "./providers/openaiCompat";
 
 // Reasoning-heavy modes get the stronger model tier.
-const HEAVY_MODES: ClaudeMode[] = ["review", "interview"];
+const HEAVY_MODES: ClaudeMode[] = ["review", "interview", "characterGen"];
 
 function tierFor(mode: ClaudeMode): ModelTier {
   return HEAVY_MODES.includes(mode) ? "heavy" : "light";
@@ -44,6 +44,16 @@ function instantiate(cfg: ResolvedProvider): AiProvider {
  */
 function candidatesFor(mode: ClaudeMode, settings: AiSettings): ResolvedProvider[] {
   const chain = resolveCandidateChain(settings);
+  // Character generation prefers claude (deepest character knowledge + native
+  // WebSearch via the Agent SDK) regardless of the user's active provider, then
+  // falls through the normal chain.
+  if (mode === "characterGen") {
+    const claude = resolveProvider("claude", settings);
+    if (claude.enabled && claude.configured) {
+      return [claude, ...chain.filter((c) => c.id !== "claude")];
+    }
+    return chain;
+  }
   if (mode !== "companion") return chain;
   const companion = normalizeCompanion(settings.companion);
   if (!companion.provider || companion.provider === "claude") return chain;
@@ -122,6 +132,7 @@ export async function openStream(
       tier,
       image: useImage,
       signal,
+      webSearch: mode === "characterGen",
     });
 
     try {

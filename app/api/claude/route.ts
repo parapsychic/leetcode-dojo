@@ -17,7 +17,9 @@ const JSON_MODES: ClaudeMode[] = ["quiz", "visualize", "coachPlan", "daily"];
 // else (learning, stub generation, review, hints, quizzes…) is deterministic for
 // a given input, so identical requests are served from disk instead of re-calling
 // the model.
-const UNCACHED_MODES: ClaudeMode[] = ["interview", "coach", "companion"];
+// characterGen normally goes through /api/companion/generate, but stays listed
+// here so a direct call can never serve stale generations from disk either.
+const UNCACHED_MODES: ClaudeMode[] = ["interview", "coach", "companion", "characterGen"];
 const LLM_CACHE_NS = "llm";
 const LLM_TTL_MS = 1000 * 60 * 60 * 24 * 30; // 30 days
 

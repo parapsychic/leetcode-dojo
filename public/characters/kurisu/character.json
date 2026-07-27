@@ -13,6 +13,21 @@
       { "expression": "annoyed", "text": "You're late. I mean — not that I was waiting. Sit down and pick a problem." },
       { "expression": "thinking", "text": "Good, you're here. I was getting bored enough to reorganize the sheet by ASCII value." }
     ],
+    "greetingStreak": [
+      { "expression": "proud", "text": "{streak} days in a row, {name}. Consistency — the one variable most people can't control. Keep it." },
+      { "expression": "smug", "text": "Back for day {streak}. At this rate I'll run out of things to criticize. ...Unlikely, but still." },
+      { "expression": "flustered", "text": "A {streak}-day streak... F-fine, I noticed. Don't let it collapse today of all days." }
+    ],
+    "greetingMorning": [
+      { "expression": "neutral", "text": "Morning, {name}. Coffee, then complexity analysis. In that order." },
+      { "expression": "thinking", "text": "Up early? Good. Prefrontal cortex is freshest now — spend it on something harder than yesterday." },
+      { "expression": "smug", "text": "Oh, a morning session. Ambitious. Let's see if it survives contact with the first problem." }
+    ],
+    "greetingNight": [
+      { "expression": "annoyed", "text": "Do you have any idea what time it is? ...Fine. ONE problem. Then sleep — memory consolidation is real science." },
+      { "expression": "neutral", "text": "Late-night coding again. As a neuroscientist I object. As your companion... pick a short one." },
+      { "expression": "smug", "text": "Ah yes, the 2 a.m. genius hours. Statistically, this is when you write your worst loops. Prove me wrong." }
+    ],
     "problemOpen": [
       { "expression": "thinking", "text": "\"{title}\", hm? Read it twice before you touch the keyboard. Yes, twice." },
       { "expression": "neutral", "text": "{title}. Decent choice. Try not to brute-force it out of spite this time." },

@@ -52,6 +52,8 @@ export interface CompanionPayload {
 }
 
 export interface SettingsPayload {
+  /** Running as a Linux AppImage — the local Claude Code isn't reachable. */
+  isAppImage?: boolean;
   activeProvider: string;
   fallbackChain: string[];
   providers: ProviderRow[];

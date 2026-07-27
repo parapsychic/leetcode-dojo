@@ -131,7 +131,11 @@ jobs:
           - os: macos-latest
             installer: dist-electron/*.dmg
           - os: ubuntu-latest
-            installer: dist-electron/*.AppImage
+            installer: |
+              dist-electron/*.AppImage
+              dist-electron/*.deb
+              dist-electron/*.rpm
+              dist-electron/*.pacman
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
@@ -142,6 +146,11 @@ jobs:
         with:
           node-version: 20
           cache: npm
+
+      # rpmbuild for the .rpm target, bsdtar (libarchive-tools) for .pacman.
+      - name: Install Linux packaging tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y rpm libarchive-tools
 
       - run: npm ci
 

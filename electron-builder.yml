@@ -59,3 +59,14 @@ linux:
   category: Development
   synopsis: Socratic DSA interview trainer
   artifactName: ${name}-${version}.${ext}
+
+# ubuntu-latest is now Ubuntu 24.04 (rpm 4.18). Its rpmbuild generates
+# /usr/lib/.build-id/ symlinks from ELF build-ids, which trips on Electron's
+# bundled prebuilt shared libraries and fails `rpmbuild -bb` with a bare exit 1
+# (fpm swallows the stderr). Since the app ships self-contained and already
+# stripped, disable the build-id link step. rpm is built before pacman, so this
+# failure was also blocking the .pacman target.
+rpm:
+  fpm:
+    - "--rpm-rpmbuild-define"
+    - "_build_id_links none"

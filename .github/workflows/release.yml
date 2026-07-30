@@ -38,13 +38,13 @@ jobs:
       tag: ${{ steps.bump.outputs.tag }}
       version: ${{ steps.bump.outputs.version }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # full history + tags, needed for git describe/log
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
 
       - name: Bump version and write release notes
         id: bump
@@ -115,7 +115,7 @@ jobs:
           git tag -a "$tag" -m "$tag"
           git push origin "HEAD:${GITHUB_REF_NAME}" --follow-tags
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: release-notes
           path: RELEASE_NOTES.md
@@ -138,13 +138,13 @@ jobs:
               dist-electron/*.pacman
     runs-on: ${{ matrix.os }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           ref: ${{ needs.version.outputs.tag }} # build exactly what was tagged
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
-          node-version: 20
+          node-version: 24
           cache: npm
 
       # rpmbuild for the .rpm target, bsdtar (libarchive-tools) for .pacman.
@@ -163,7 +163,7 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
         run: npm run electron:build -- --publish never
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: installers-${{ matrix.os }}
           path: ${{ matrix.installer }}
@@ -173,18 +173,18 @@ jobs:
     needs: [version, build]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           pattern: installers-*
           path: dist
           merge-multiple: true
 
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           name: release-notes
           path: notes
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.version.outputs.tag }}
           name: ${{ needs.version.outputs.tag }}

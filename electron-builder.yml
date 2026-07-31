@@ -66,7 +66,42 @@ linux:
 # (fpm swallows the stderr). Since the app ships self-contained and already
 # stripped, disable the build-id link step. rpm is built before pacman, so this
 # failure was also blocking the .pacman target.
+#
+# `--log debug` is diagnostic: fpm relays rpmbuild's own stdout/stderr only at
+# its debug level, so without it CI shows the failing rpmbuild command but not
+# a single line of why it failed. Drop it once the rpm target is green again.
 rpm:
   fpm:
     - "--rpm-rpmbuild-define"
     - "_build_id_links none"
+    - "--log"
+    - "debug"
+
+# electron-builder's built-in pacman depends list is unmaintained and names two
+# packages Arch no longer ships — `http-parser` (dropped, superseded by llhttp)
+# and `libappindicator-gtk3` (moved out of the repos long ago) — so `pacman -U`
+# aborts with "target not found" before it installs anything. The rest of that
+# list (c-ares, ffmpeg, libvpx, minizip, re2, snappy, libevent, libxslt) is
+# wrong in a subtler way: those are the deps of Arch's *own* electron package,
+# which is linked against system libraries. Our Electron is the upstream
+# prebuilt binary and bundles them, so the only real requirements are the
+# system libraries it actually dlopens/links. Every name below was checked
+# against the current Arch repos.
+pacman:
+  depends:
+    - gtk3
+    - nss
+    - nspr
+    - at-spi2-core
+    - libcups
+    - libdrm
+    - mesa
+    - alsa-lib
+    - libxkbcommon
+    - libxcomposite
+    - libxdamage
+    - libxrandr
+    - libxtst
+    - libnotify
+    - libsecret
+    - xdg-utils

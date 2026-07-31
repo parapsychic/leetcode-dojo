@@ -147,10 +147,20 @@ jobs:
           node-version: 24
           cache: npm
 
-      # rpmbuild for the .rpm target, bsdtar (libarchive-tools) for .pacman.
+      # rpmbuild for the .rpm target (Ubuntu ships it in `rpm`, there is no
+      # `rpm-build` package here — that is the Fedora name), fakeroot so fpm can
+      # stage the buildroot with root-owned files as the unprivileged runner
+      # user, and bsdtar (libarchive-tools) for .pacman.
       - name: Install Linux packaging tools
         if: runner.os == 'Linux'
-        run: sudo apt-get update && sudo apt-get install -y rpm libarchive-tools
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y rpm fakeroot libarchive-tools binutils
+          echo "--- packaging tool versions ---"
+          rpmbuild --version
+          fakeroot --version
+          bsdtar --version
+          strip --version | head -1
 
       - run: npm ci
 
@@ -161,7 +171,26 @@ jobs:
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
           # unsigned builds; flip when signing certs are configured
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
+          # fpm only logs rpmbuild's own stderr at its debug level, so a failing
+          # rpmbuild otherwise surfaces as a bare "exit code 1" with no reason.
+          # `rpm.fpm: [--log, debug]` in electron-builder.yml turns that on;
+          # DEBUG=electron-builder makes electron-builder relay the subprocess
+          # output. Both are diagnostics only — drop them once rpm builds again.
+          DEBUG: electron-builder
         run: npm run electron:build -- --publish never
+
+      # electron-builder writes the resolved config + subprocess trail here;
+      # on a packaging failure this is the only place the details survive.
+      - name: Dump build logs on failure
+        if: failure()
+        run: |
+          echo "--- dist-electron ---"
+          ls -la dist-electron || true
+          for f in dist-electron/builder-debug.yml dist-electron/builder-effective-config.yaml; do
+            echo "--- $f ---"
+            cat "$f" || true
+          done
+        shell: bash
 
       - uses: actions/upload-artifact@v7
         with:

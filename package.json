@@ -14,7 +14,7 @@
     "start": "next start",
     "lint": "eslint",
     "electron:dev": "concurrently -k -n next,electron -c blue,magenta \"next dev -p 3000\" \"wait-on http://localhost:3000 && electron .\"",
-    "electron:build": "next build && electron-builder",
+    "electron:build": "next build && node scripts/materialize-standalone-symlinks.mjs && electron-builder",
     "prepare": "husky"
   },
   "dependencies": {

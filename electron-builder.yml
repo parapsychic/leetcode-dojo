@@ -41,10 +41,23 @@ nsis:
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: true
 
+# macos-latest runners are Apple Silicon, so the CI builds both slices
+# explicitly (--x64 --arm64) — otherwise Intel Macs get no build at all — and
+# artifactName has to carry ${arch} to keep the two dmgs apart.
+#
+# identity "-" is an ad-hoc signature. macOS refuses to launch an *unsigned*
+# arm64 binary outright, and rebranding the app invalidates the signature
+# Electron shipped with, so without this the arm64 dmg is dead on arrival.
+# hardenedRuntime must be off to go with it: hardened runtime + ad-hoc means
+# library validation rejects Electron's own frameworks at launch. This is not
+# notarization — first launch still needs right-click → Open — but the app runs.
 mac:
   icon: build/icon.png
   target: dmg
   category: public.app-category.developer-tools
+  identity: "-"
+  hardenedRuntime: false
+  artifactName: ${productName}-${version}-${arch}.${ext}
 
 # Native packages (deb/rpm/pacman) are preferred on Linux: the AppImage's
 # bundled runtime can't reach the natively installed Claude Code, so the app
@@ -67,15 +80,51 @@ linux:
 # stripped, disable the build-id link step. rpm is built before pacman, so this
 # failure was also blocking the .pacman target.
 #
-# `--log debug` is diagnostic: fpm relays rpmbuild's own stdout/stderr only at
-# its debug level, so without it CI shows the failing rpmbuild command but not
-# a single line of why it failed. Drop it once the rpm target is green again.
+# Requires are given in rpm's rich "(a or b)" form wherever Fedora and openSUSE
+# disagree on a name, which is what electron-builder's own defaults already do
+# for libXtst/libuuid. The defaults predate Chromium needing gbm, drm, cups,
+# alsa and xkbcommon directly, so those are added here. Every name was checked
+# against current Fedora metadata.
 rpm:
+  depends:
+    - "(gtk3 or libgtk-3-0)"
+    - "(libnotify or libnotify4)"
+    - "(nss or mozilla-nss)"
+    - "(libXScrnSaver or libXss1)"
+    - "(libXtst or libXtst6)"
+    - "(at-spi2-core or libatspi0)"
+    - "(libuuid or libuuid1)"
+    - "(alsa-lib or libasound2)"
+    - "(mesa-libgbm or libgbm1)"
+    - "(libdrm or libdrm2)"
+    - "(cups-libs or libcups2)"
+    - "(libxkbcommon or libxkbcommon0)"
+    - "(libsecret or libsecret-1-0)"
+    - xdg-utils
   fpm:
     - "--rpm-rpmbuild-define"
     - "_build_id_links none"
-    - "--log"
-    - "debug"
+
+# Same gap on the Debian side: the built-in list predates Chromium linking gbm,
+# drm, cups and alsa directly. The classic (pre-t64) names are used deliberately
+# — on 64-bit Debian/Ubuntu the t64 packages Provide them (verified:
+# libasound2t64 provides libasound2, libcups2t64 provides libcups2, and so on),
+# so one name resolves on both old and new releases.
+deb:
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - xdg-utils
+    - libatspi2.0-0
+    - libuuid1
+    - libsecret-1-0
+    - libasound2
+    - libgbm1
+    - libdrm2
+    - libcups2
 
 # electron-builder's built-in pacman depends list is unmaintained and names two
 # packages Arch no longer ships — `http-parser` (dropped, superseded by llhttp)

@@ -128,9 +128,15 @@ jobs:
         include:
           - os: windows-latest
             installer: dist-electron/*.exe
+            builder_args: ""
+          # macos-latest is Apple Silicon, so an unqualified build produces an
+          # arm64-only dmg and Intel Macs get nothing. Both slices are built
+          # from the one arm64 runner; electron-builder downloads each Electron.
           - os: macos-latest
             installer: dist-electron/*.dmg
+            builder_args: --mac --x64 --arm64
           - os: ubuntu-latest
+            builder_args: ""
             installer: |
               dist-electron/*.AppImage
               dist-electron/*.deb
@@ -169,15 +175,20 @@ jobs:
           NEXT_PUBLIC_FIREBASE_API_KEY: ${{ secrets.FIREBASE_API_KEY }}
           NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: ${{ secrets.FIREBASE_AUTH_DOMAIN }}
           NEXT_PUBLIC_FIREBASE_PROJECT_ID: ${{ secrets.FIREBASE_PROJECT_ID }}
-          # unsigned builds; flip when signing certs are configured
+          # No Developer ID cert: mac.identity "-" ad-hoc signs instead, which is
+          # the minimum macOS needs to launch an arm64 build. Keeping discovery
+          # off means a cert sitting in some future runner keychain can't be
+          # picked up silently — ad-hoc stays a deliberate choice.
           CSC_IDENTITY_AUTO_DISCOVERY: "false"
-          # fpm only logs rpmbuild's own stderr at its debug level, so a failing
-          # rpmbuild otherwise surfaces as a bare "exit code 1" with no reason.
-          # `rpm.fpm: [--log, debug]` in electron-builder.yml turns that on;
-          # DEBUG=electron-builder makes electron-builder relay the subprocess
-          # output. Both are diagnostics only — drop them once rpm builds again.
+          # DEBUG=electron-builder makes electron-builder pass `--log debug` to
+          # fpm and relay its output. FPM_DEBUG=true is the one that matters for
+          # the rpm failure: without it electron-builder catches rpmbuild's
+          # "error: File not found: <path>" and reports only that *some* file was
+          # missing, swallowing which one. Both are diagnostics — drop them once
+          # the rpm target is green.
           DEBUG: electron-builder
-        run: npm run electron:build -- --publish never
+          FPM_DEBUG: "true"
+        run: npm run electron:build -- --publish never ${{ matrix.builder_args }}
 
       # electron-builder writes the resolved config + subprocess trail here;
       # on a packaging failure this is the only place the details survive.

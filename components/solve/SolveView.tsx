@@ -700,7 +700,7 @@ export function SolveView({
             {/* Whiteboard stays mounted so the sketch persists and the coach can
                 read it even while another tab is open. */}
             <div className={cn("h-full", tab === "board" ? "block" : "hidden")}>
-              <Whiteboard ref={whiteboardRef} />
+              <Whiteboard ref={whiteboardRef} active={tab === "board"} />
             </div>
 
             {tab === "ask" && (

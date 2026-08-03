@@ -20,11 +20,20 @@ export interface WhiteboardHandle {
 const COLORS = ["#e5e7eb", "#38bdf8", "#34d399", "#f59e0b", "#f43f5e"];
 const MAX_EXPORT = 768; // cap the longest side of the exported PNG
 
+interface WhiteboardProps {
+  /** Whether the Whiteboard tab is the visible one. The board stays mounted while
+   *  hidden, so the colour hotkeys have to be gated on this. */
+  active?: boolean;
+}
+
 /**
  * Zero-dependency freehand whiteboard. The learner sketches their thinking here
  * and the coach can pull the current drawing (auto-included when it has content).
  */
-export const Whiteboard = forwardRef<WhiteboardHandle>(function Whiteboard(_, ref) {
+export const Whiteboard = forwardRef<WhiteboardHandle, WhiteboardProps>(function Whiteboard(
+  { active = true },
+  ref,
+) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const wrapRef = useRef<HTMLDivElement>(null);
   const drawing = useRef(false);
@@ -66,6 +75,26 @@ export const Whiteboard = forwardRef<WhiteboardHandle>(function Whiteboard(_, re
     ro.observe(wrap);
     return () => ro.disconnect();
   }, []);
+
+  // Top-row 1–5 pick the matching swatch (Numpad digits are left alone). Skipped
+  // while another tab is showing, and while the learner is typing — the Monaco
+  // editor sits next to the board and stays focusable.
+  useEffect(() => {
+    if (!active) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const el = e.target as HTMLElement | null;
+      if (el?.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(el?.tagName ?? "")) return;
+      const digit = /^Digit([1-9])$/.exec(e.code);
+      const i = digit ? Number(digit[1]) - 1 : -1;
+      if (i < 0 || i >= COLORS.length) return;
+      e.preventDefault();
+      setColor(COLORS[i]);
+      setErasing(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [active]);
 
   useImperativeHandle(ref, () => ({
     getImage() {
@@ -131,7 +160,7 @@ export const Whiteboard = forwardRef<WhiteboardHandle>(function Whiteboard(_, re
     <div className="flex h-full flex-col gap-2">
       <div className="flex flex-wrap items-center gap-2">
         <div className="flex items-center gap-1">
-          {COLORS.map((c) => (
+          {COLORS.map((c, i) => (
             <button
               key={c}
               onClick={() => {
@@ -143,7 +172,8 @@ export const Whiteboard = forwardRef<WhiteboardHandle>(function Whiteboard(_, re
                 !erasing && color === c ? "border-foreground" : "border-border",
               )}
               style={{ backgroundColor: c }}
-              aria-label={`color ${c}`}
+              title={`Color ${i + 1} (press ${i + 1})`}
+              aria-label={`color ${c}, shortcut ${i + 1}`}
             />
           ))}
         </div>
@@ -192,7 +222,7 @@ export const Whiteboard = forwardRef<WhiteboardHandle>(function Whiteboard(_, re
       </div>
       <p className="text-[11px] text-muted">
         Sketch your approach — when you have something drawn, the coach will glance
-        at it on its next check-in.
+        at it on its next check-in. Press 1–5 to switch colors.
       </p>
     </div>
   );
